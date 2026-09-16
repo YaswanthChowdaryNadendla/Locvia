@@ -1,0 +1,43 @@
+{
+  "name": "Locvia — Connecting You to Local",
+  "short_name": "Locvia",
+  "description": "Hyperlocal grocery delivery platform connecting you with fresh products from neighbourhood shops.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0c831f",
+  "orientation": "portrait-primary",
+  "categories": ["shopping", "food"],
+  "lang": "en-IN",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Browse Shops",
+      "short_name": "Shops",
+      "description": "Discover nearby local shops",
+      "url": "/customer/shops",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My Orders",
+      "short_name": "Orders",
+      "description": "Track your orders",
+      "url": "/customer/orders",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

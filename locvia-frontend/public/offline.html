@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#22c55e" />
+  <title>Offline — Locvia</title>
+
+  <!-- Google Fonts (may not load offline, gracefully degrades) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Design tokens (mirror src/index.css) ── */
+    :root {
+      --color-primary:        #0c831f;
+      --color-primary-dark:   #096b19;
+      --color-primary-light:  #dcfce7;
+      --color-primary-lighter:#f0fdf4;
+      --color-charcoal:       #1c1c2e;
+      --color-gray-50:        #f9fafb;
+      --color-gray-100:       #f3f4f6;
+      --color-gray-400:       #9ca3af;
+      --color-gray-500:       #6b7280;
+      --color-gray-600:       #4b5563;
+      --color-gray-700:       #374151;
+      --color-gray-900:       #111827;
+      --color-bg-warm:        #fafaf8;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background-color: var(--color-bg-warm);
+      color: var(--color-gray-900);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Navbar stub ── */
+    .navbar {
+      background: #fff;
+      border-bottom: 1px solid #f0f0f0;
+      padding: 0 1rem;
+      height: 60px;
+      display: flex;
+      align-items: center;
+    }
+
+    .wordmark {
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .wordmark .loc { color: var(--color-charcoal); }
+    .wordmark .via { color: var(--color-primary); }
+    .wordmark .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      margin-left: 1px;
+      margin-bottom: 2px;
+    }
+
+    /* ── Main content ── */
+    .main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #f0f0f0;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+      padding: 2.5rem 2rem;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+    }
+
+    /* ── Wifi icon (pure CSS) ── */
+    .wifi-icon {
+      width: 80px;
+      height: 80px;
+      border-radius: 20px;
+      background: var(--color-gray-100);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.5rem;
+      position: relative;
+    }
+
+    .wifi-icon svg {
+      width: 40px;
+      height: 40px;
+      color: var(--color-gray-400);
+    }
+
+    /* ── Typography ── */
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--color-gray-900);
+      margin-bottom: 0.5rem;
+    }
+
+    .tagline {
+      font-size: 0.875rem;
+      color: var(--color-gray-500);
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── Info boxes ── */
+    .info-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.625rem;
+      margin-bottom: 2rem;
+      text-align: left;
+    }
+
+    .info-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.625rem;
+      background: var(--color-primary-lighter);
+      border: 1px solid var(--color-primary-light);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      font-size: 0.8125rem;
+      color: var(--color-gray-700);
+      line-height: 1.4;
+    }
+
+    .info-item .dot-icon {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      flex-shrink: 0;
+      margin-top: 5px;
+    }
+
+    /* ── Buttons ── */
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      padding: 0.75rem 1.5rem;
+      background: var(--color-primary);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+      text-decoration: none;
+      min-height: 48px;
+      margin-bottom: 0.75rem;
+    }
+
+    .btn-primary:hover {
+      background: var(--color-primary-dark);
+      transform: translateY(-1px);
+    }
+
+    .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 0.75rem 1.5rem;
+      background: transparent;
+      color: var(--color-gray-600);
+      border: 1.5px solid var(--color-gray-100);
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      min-height: 48px;
+    }
+
+    .btn-ghost:hover {
+      background: var(--color-gray-50);
+    }
+
+    /* ── Status indicator ── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 1.5rem;
+      font-size: 0.75rem;
+      color: var(--color-gray-400);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-gray-300);
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 1.25rem;
+      font-size: 0.75rem;
+      color: var(--color-gray-400);
+      border-top: 1px solid #f0f0f0;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card { animation: fadeIn 0.4s ease forwards; }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      .card { padding: 2rem 1.25rem; }
+      h1 { font-size: 1.25rem; }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Navbar stub (no React needed here) -->
+  <nav class="navbar">
+    <a href="/" class="wordmark">
+      <span class="loc">Loc</span>
+      <span class="via">via</span>
+      <span class="dot"></span>
+    </a>
+  </nav>
+
+  <!-- Offline content -->
+  <main class="main">
+    <div class="card">
+
+      <!-- Icon -->
+      <div class="wifi-icon">
+        <!-- Wifi-Off SVG (inline, no external deps) -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="1" y1="1" x2="23" y2="23"></line>
+          <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
+          <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
+          <path d="M10.71 5.05A16 16 0 0 1 22.56 9"></path>
+          <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
+          <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+          <line x1="12" y1="20" x2="12.01" y2="20"></line>
+        </svg>
+      </div>
+
+      <h1>You're Offline</h1>
+      <p class="tagline">
+        No internet connection detected.<br />
+        Locvia needs connectivity to show you local shops and fresh products.
+      </p>
+
+      <!-- What you can still do -->
+      <ul class="info-list">
+        <li class="info-item">
+          <span class="dot-icon"></span>
+          <span>Previously visited pages may still be available from cache.</span>
+        </li>
+        <li class="info-item">
+          <span class="dot-icon"></span>
+          <span>Orders and payments require an active internet connection.</span>
+        </li>
+        <li class="info-item">
+          <span class="dot-icon"></span>
+          <span>Your cart is saved locally and will sync when you reconnect.</span>
+        </li>
+      </ul>
+
+      <!-- Actions -->
+      <button class="btn-primary" onclick="window.location.reload()">
+        ↻ &nbsp;Try Again
+      </button>
+      <a href="/" class="btn-ghost">
+        Go to Home
+      </a>
+
+      <!-- Status -->
+      <div class="status-bar">
+        <span class="status-dot"></span>
+        <span id="status-text">Waiting for connection…</span>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    © 2025 Locvia · Connecting You to Local.
+  </footer>
+
+  <!-- Auto-redirect when connection is restored -->
+  <script>
+    // Update status text live
+    function updateStatus() {
+      const statusEl = document.getElementById('status-text');
+      if (navigator.onLine) {
+        statusEl.textContent = 'Connection restored! Redirecting…';
+        document.querySelector('.status-dot').style.background = '#22c55e';
+        setTimeout(() => window.location.reload(), 1200);
+      } else {
+        statusEl.textContent = 'Waiting for connection…';
+      }
+    }
+
+    window.addEventListener('online', updateStatus);
+    window.addEventListener('offline', updateStatus);
+    updateStatus();
+  </script>
+</body>
+</html>
