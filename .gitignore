@@ -9,7 +9,6 @@ locvia-frontend/node_modules/
 locvia-frontend/dist/
 locvia-frontend/.env
 locvia-frontend/.env.local
-locvia-frontend/.env.production
 locvia-frontend/*.log
 
 # General

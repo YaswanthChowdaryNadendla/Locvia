@@ -3,6 +3,7 @@ package com.locvia.service;
 import com.locvia.dto.AdminUpdateUserRequest;
 import com.locvia.dto.UpdateUserRequest;
 import com.locvia.dto.UserResponse;
+import com.locvia.entity.AccountStatus;
 import com.locvia.entity.User;
 import com.locvia.entity.UserRole;
 import com.locvia.exception.EmailAlreadyExistsException;
@@ -217,6 +218,66 @@ public class UserService {
 
         targetUser.setActive(false);
         userRepository.save(targetUser);
+    }
+
+    /**
+     * Approves a SHOP_OWNER or DELIVERY_PARTNER account, allowing it to perform
+     * operational actions on the platform.
+     * Prevents administrators from approving their own account unnecessarily.
+     *
+     * @param id         target user ID
+     * @param adminEmail authenticated administrator's email
+     * @return updated UserResponse with accountStatus = APPROVED
+     */
+    @Transactional
+    public UserResponse approveUser(Long id, String adminEmail) {
+        User targetUser = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+
+        User admin = findUserByNormalizedEmail(adminEmail);
+
+        // Prevent admin from approving themselves (not meaningful but blocks the action)
+        if (targetUser.getId().equals(admin.getId())) {
+            throw new SecurityException("Administrators cannot approve their own account");
+        }
+
+        if (targetUser.getRole() == UserRole.CUSTOMER || targetUser.getRole() == UserRole.ADMIN) {
+            throw new IllegalArgumentException(
+                    "Approval is only applicable to SHOP_OWNER and DELIVERY_PARTNER accounts");
+        }
+
+        targetUser.setAccountStatus(AccountStatus.APPROVED);
+        User updated = userRepository.save(targetUser);
+        return UserResponse.fromEntity(updated);
+    }
+
+    /**
+     * Rejects a SHOP_OWNER or DELIVERY_PARTNER account.
+     * The account remains blocked from operational APIs.
+     *
+     * @param id         target user ID
+     * @param adminEmail authenticated administrator's email
+     * @return updated UserResponse with accountStatus = REJECTED
+     */
+    @Transactional
+    public UserResponse rejectUser(Long id, String adminEmail) {
+        User targetUser = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+
+        User admin = findUserByNormalizedEmail(adminEmail);
+
+        if (targetUser.getId().equals(admin.getId())) {
+            throw new SecurityException("Administrators cannot reject their own account");
+        }
+
+        if (targetUser.getRole() == UserRole.CUSTOMER || targetUser.getRole() == UserRole.ADMIN) {
+            throw new IllegalArgumentException(
+                    "Rejection is only applicable to SHOP_OWNER and DELIVERY_PARTNER accounts");
+        }
+
+        targetUser.setAccountStatus(AccountStatus.REJECTED);
+        User updated = userRepository.save(targetUser);
+        return UserResponse.fromEntity(updated);
     }
 
     private User findUserByNormalizedEmail(String email) {

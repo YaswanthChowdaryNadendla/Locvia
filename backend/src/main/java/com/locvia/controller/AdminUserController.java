@@ -92,4 +92,38 @@ public class AdminUserController {
         userService.deactivateUserForAdmin(id, principal.getName());
         return ResponseEntity.ok(Map.of("message", "User account deactivated successfully"));
     }
+
+    /**
+     * Approves a SHOP_OWNER or DELIVERY_PARTNER account.
+     * Only Admins may call this endpoint. Approved users can perform operational actions.
+     * PUT /api/admin/users/{id}/approve
+     *
+     * @param id        target user ID
+     * @param principal authenticated administrator principal
+     * @return updated UserResponse with accountStatus = APPROVED
+     */
+    @PutMapping("/{id}/approve")
+    public ResponseEntity<UserResponse> approveUser(
+            @PathVariable Long id,
+            Principal principal) {
+        UserResponse response = userService.approveUser(id, principal.getName());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Rejects a SHOP_OWNER or DELIVERY_PARTNER account.
+     * Only Admins may call this endpoint. Rejected users remain blocked from operational APIs.
+     * PUT /api/admin/users/{id}/reject
+     *
+     * @param id        target user ID
+     * @param principal authenticated administrator principal
+     * @return updated UserResponse with accountStatus = REJECTED
+     */
+    @PutMapping("/{id}/reject")
+    public ResponseEntity<UserResponse> rejectUser(
+            @PathVariable Long id,
+            Principal principal) {
+        UserResponse response = userService.rejectUser(id, principal.getName());
+        return ResponseEntity.ok(response);
+    }
 }

@@ -83,8 +83,8 @@ class AddressApiTests {
 
     @BeforeEach
     void setUp() {
-        addressRepository.deleteAll();
         orderRepository.deleteAll();
+        addressRepository.deleteAll();
         inventoryRepository.deleteAll();
         productRepository.deleteAll();
         shopRepository.deleteAll();
@@ -107,8 +107,8 @@ class AddressApiTests {
 
     @AfterEach
     void tearDown() {
-        addressRepository.deleteAll();
         orderRepository.deleteAll();
+        addressRepository.deleteAll();
         inventoryRepository.deleteAll();
         productRepository.deleteAll();
         shopRepository.deleteAll();

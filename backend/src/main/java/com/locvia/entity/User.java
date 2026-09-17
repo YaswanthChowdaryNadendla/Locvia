@@ -39,6 +39,16 @@ public class User {
     @Column(nullable = false)
     private Boolean active = true;
 
+    /**
+     * Approval status for SHOP_OWNER and DELIVERY_PARTNER accounts.
+     * CUSTOMER accounts default to APPROVED. The column DEFAULT 'APPROVED'
+     * ensures existing database rows are not affected when this column is added.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_status", nullable = false, length = 20,
+            columnDefinition = "VARCHAR(20) DEFAULT 'APPROVED'")
+    private AccountStatus accountStatus = AccountStatus.APPROVED;
+
     public User() {
     }
 
@@ -135,5 +145,13 @@ public class User {
 
     public void setActive(Boolean active) {
         this.active = active;
+    }
+
+    public AccountStatus getAccountStatus() {
+        return accountStatus;
+    }
+
+    public void setAccountStatus(AccountStatus accountStatus) {
+        this.accountStatus = accountStatus;
     }
 }

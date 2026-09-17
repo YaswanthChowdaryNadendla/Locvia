@@ -4,6 +4,7 @@ import com.locvia.dto.AdminUpdateShopRequest;
 import com.locvia.dto.CreateShopRequest;
 import com.locvia.dto.ShopResponse;
 import com.locvia.dto.UpdateShopRequest;
+import com.locvia.entity.AccountStatus;
 import com.locvia.entity.Shop;
 import com.locvia.entity.User;
 import com.locvia.entity.UserRole;
@@ -71,6 +72,13 @@ public class ShopService {
 
         if (owner.getRole() != UserRole.SHOP_OWNER && owner.getRole() != UserRole.ADMIN) {
             throw new AccessDeniedException("Only registered shop owners can create shops");
+        }
+
+        // Approval enforcement: SHOP_OWNER must be APPROVED by Admin before operating
+        if (owner.getRole() == UserRole.SHOP_OWNER
+                && owner.getAccountStatus() != AccountStatus.APPROVED) {
+            throw new AccessDeniedException(
+                    "Your account is pending admin approval. You cannot create a shop until approved.");
         }
 
         Shop shop = new Shop();
@@ -143,6 +151,13 @@ public class ShopService {
 
         if (!shop.getOwner().getId().equals(owner.getId())) {
             throw new AccessDeniedException("Access denied: You do not have permission to modify another owner's shop");
+        }
+
+        // Approval enforcement: SHOP_OWNER must be APPROVED by Admin before operating
+        if (owner.getRole() == UserRole.SHOP_OWNER
+                && owner.getAccountStatus() != AccountStatus.APPROVED) {
+            throw new AccessDeniedException(
+                    "Your account is pending admin approval. You cannot update shop details until approved.");
         }
 
         if (request.getName() != null && !request.getName().isBlank()) {

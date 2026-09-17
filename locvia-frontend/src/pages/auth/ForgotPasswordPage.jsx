@@ -1,13 +1,15 @@
 // src/pages/auth/ForgotPasswordPage.jsx
 // Module 6 — Authentication UI (Forgot Password)
+// Password recovery flow — Email only
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
 import heroImage from '../../assets/hero1.png';
+import { isValidEmail } from '../../utils/validators';
 
 const ForgotPasswordPage = () => {
-  const [identifier, setIdentifier]   = useState('');
+  const [email, setEmail]             = useState('');
   const [error, setError]             = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
 
@@ -15,8 +17,15 @@ const ForgotPasswordPage = () => {
     e.preventDefault();
     setError('');
 
-    if (!identifier.trim()) {
-      setError('Email or Mobile Number is required');
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail) {
+      setError('Email is required');
+      return;
+    }
+
+    if (!isValidEmail(trimmedEmail)) {
+      setError('Please enter a valid email address');
       return;
     }
 
@@ -59,7 +68,7 @@ const ForgotPasswordPage = () => {
             <>
               <h1 className="auth-title">Forgot your password?</h1>
               <p className="auth-subtitle">
-                Enter your email or mobile number and we'll help you reset your password.
+                Enter your email and we'll send you a verification code.
               </p>
 
               {error && (
@@ -71,18 +80,19 @@ const ForgotPasswordPage = () => {
 
               <form onSubmit={handleSubmit} className="auth-form" noValidate>
                 <div className="auth-field">
-                  <label htmlFor="identifier" className="auth-label">
-                    Email / Mobile Number
+                  <label htmlFor="email" className="auth-label">
+                    Email
                   </label>
                   <div className="auth-input-wrap">
                     <input
-                      id="identifier"
-                      type="text"
+                      id="email"
+                      name="email"
+                      type="email"
                       className={`auth-input ${error ? 'auth-input--error' : ''}`}
-                      placeholder="Enter your email or mobile number"
-                      value={identifier}
-                      onChange={(e) => { setIdentifier(e.target.value); setError(''); }}
-                      autoComplete="username"
+                      placeholder="Enter your email address"
+                      value={email}
+                      onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                      autoComplete="email"
                     />
                   </div>
                 </div>
@@ -97,12 +107,12 @@ const ForgotPasswordPage = () => {
               <CheckCircle2 size={48} className="auth-success-icon" />
               <h2 className="auth-title" style={{ marginTop: '1rem' }}>Check your inbox</h2>
               <p className="auth-subtitle" style={{ marginBottom: '1.5rem' }}>
-                We have sent instructions to <strong>{identifier}</strong> to help you reset your password.
+                We have sent a verification code to <strong>{email}</strong> to help you reset your password.
               </p>
               <button
                 type="button"
                 className="auth-btn-secondary"
-                onClick={() => { setIsSubmitted(false); setIdentifier(''); }}
+                onClick={() => { setIsSubmitted(false); setEmail(''); }}
               >
                 Send again
               </button>

@@ -105,6 +105,8 @@ export const ENDPOINTS = {
     METRICS: '/admin/metrics',
     USERS: '/admin/users',
     USER_BY_ID: (id) => `/admin/users/${id}`,
+    APPROVE_USER: (id) => `/admin/users/${id}/approve`,
+    REJECT_USER: (id) => `/admin/users/${id}/reject`,
     SHOPS: '/admin/shops',
     SHOP_BY_ID: (id) => `/admin/shops/${id}`,
     CATEGORIES: '/admin/categories',

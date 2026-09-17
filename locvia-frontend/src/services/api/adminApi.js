@@ -15,7 +15,7 @@ export const getUsers = async (params = {}) => {
 };
 
 /**
- * Updates a user's platform status ('ACTIVE', 'INACTIVE', 'SUSPENDED').
+ * Updates a user's platform active status.
  * PUT /api/admin/users/{id}
  * @param {string|number} userId
  * @param {string} status
@@ -23,6 +23,26 @@ export const getUsers = async (params = {}) => {
  */
 export const updateUserStatus = async (userId, status) => {
   return axiosClient.put(ENDPOINTS.ADMIN.USER_BY_ID(userId), { status });
+};
+
+/**
+ * Approves a SHOP_OWNER or DELIVERY_PARTNER account.
+ * PUT /api/admin/users/{id}/approve
+ * @param {string|number} userId
+ * @returns {Promise<Object>} Updated user with accountStatus = APPROVED
+ */
+export const approveUser = async (userId) => {
+  return axiosClient.put(ENDPOINTS.ADMIN.APPROVE_USER(userId));
+};
+
+/**
+ * Rejects a SHOP_OWNER or DELIVERY_PARTNER account.
+ * PUT /api/admin/users/{id}/reject
+ * @param {string|number} userId
+ * @returns {Promise<Object>} Updated user with accountStatus = REJECTED
+ */
+export const rejectUser = async (userId) => {
+  return axiosClient.put(ENDPOINTS.ADMIN.REJECT_USER(userId));
 };
 
 /**
@@ -159,6 +179,8 @@ export const getSystemMetrics = async () => {
 export default {
   getUsers,
   updateUserStatus,
+  approveUser,
+  rejectUser,
   getShops,
   updateShopStatus,
   getCategories,

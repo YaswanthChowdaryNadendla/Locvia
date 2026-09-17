@@ -6,6 +6,7 @@ import com.locvia.exception.ResourceNotFoundException;
 import com.locvia.repository.DeliveryRepository;
 import com.locvia.repository.OrderRepository;
 import com.locvia.repository.UserRepository;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,6 +68,12 @@ public class DeliveryService {
             throw new IllegalArgumentException("Delivery partner account is deactivated.");
         }
 
+        // Approval enforcement: delivery partner must be APPROVED before receiving orders
+        if (partner.getAccountStatus() != AccountStatus.APPROVED) {
+            throw new IllegalArgumentException(
+                    "Delivery partner account is not approved. Admin must approve the account before assignment.");
+        }
+
         Delivery delivery = new Delivery();
         delivery.setOrder(order);
         delivery.setDeliveryPartner(partner);
@@ -86,20 +93,24 @@ public class DeliveryService {
 
     /**
      * Retrieves deliveries currently available and assigned to the authenticated delivery partner.
+     * Requires the partner account to be APPROVED.
      */
     @Transactional(readOnly = true)
     public List<DeliveryResponse> getPartnerRequests(String partnerEmail) {
         User partner = getUserByEmail(partnerEmail);
+        requireApprovedDeliveryPartner(partner);
         List<Delivery> deliveries = deliveryRepository.findByDeliveryPartnerIdAndStatusOrderByAssignedAtDesc(partner.getId(), DeliveryStatus.ASSIGNED);
         return mapToDeliveryResponseList(deliveries);
     }
 
     /**
      * Retrieves active (non-completed and non-cancelled) deliveries for the authenticated delivery partner.
+     * Requires the partner account to be APPROVED.
      */
     @Transactional(readOnly = true)
     public List<DeliveryResponse> getPartnerActiveDeliveries(String partnerEmail) {
         User partner = getUserByEmail(partnerEmail);
+        requireApprovedDeliveryPartner(partner);
         List<DeliveryStatus> activeStatuses = List.of(DeliveryStatus.ASSIGNED, DeliveryStatus.PICKED_UP, DeliveryStatus.OUT_FOR_DELIVERY);
         List<Delivery> deliveries = deliveryRepository.findByDeliveryPartnerIdAndStatusInOrderByUpdatedAtDesc(partner.getId(), activeStatuses);
         return mapToDeliveryResponseList(deliveries);
@@ -107,10 +118,12 @@ public class DeliveryService {
 
     /**
      * Retrieves completed deliveries for the authenticated delivery partner.
+     * Requires the partner account to be APPROVED.
      */
     @Transactional(readOnly = true)
     public List<DeliveryResponse> getPartnerCompletedDeliveries(String partnerEmail) {
         User partner = getUserByEmail(partnerEmail);
+        requireApprovedDeliveryPartner(partner);
         List<Delivery> deliveries = deliveryRepository.findByDeliveryPartnerIdAndStatusOrderByDeliveredAtDesc(partner.getId(), DeliveryStatus.DELIVERED);
         return mapToDeliveryResponseList(deliveries);
     }
@@ -150,6 +163,8 @@ public class DeliveryService {
             if (delivery.getDeliveryPartner() == null || !delivery.getDeliveryPartner().getId().equals(caller.getId())) {
                 throw new ResourceNotFoundException("Delivery not found with id: " + deliveryId);
             }
+            // Approval enforcement: delivery partner must be APPROVED before updating delivery status
+            requireApprovedDeliveryPartner(caller);
         }
 
         DeliveryStatus current = delivery.getStatus();
@@ -305,5 +320,18 @@ public class DeliveryService {
     private User getUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+    }
+
+    /**
+     * Throws AccessDeniedException if the delivery partner account has not been approved by Admin.
+     * This prevents PENDING or REJECTED accounts from accessing operational delivery APIs.
+     *
+     * @param partner the delivery partner User entity
+     */
+    private void requireApprovedDeliveryPartner(User partner) {
+        if (partner.getAccountStatus() != AccountStatus.APPROVED) {
+            throw new AccessDeniedException(
+                    "Your account is pending admin approval. You cannot access delivery operations until approved.");
+        }
     }
 }

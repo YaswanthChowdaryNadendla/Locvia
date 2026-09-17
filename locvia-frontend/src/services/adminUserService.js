@@ -1,101 +1,88 @@
 // src/services/adminUserService.js
 // Service layer for Admin User Management
-// Reads users without any mock/demo data seeding.
+// Connects to the real Spring Boot backend API via adminApi.
+// Previously used localStorage — replaced with live API calls.
 
+import * as adminApi from './api/adminApi';
 import { ROLES } from '../data/users';
 
 export { ROLES };
 
-const USERS_STORAGE_KEY = 'locvia_all_users';
-
 /**
- * Normalizes user object with safe default fallbacks
+ * Fetches all platform users from the Spring Boot backend.
+ * GET /api/admin/users
+ * Returns an array of user objects including accountStatus.
+ * @param {Object} [params] optional query parameters (role, active, search)
+ * @returns {Promise<Array>}
  */
-const normalizeUser = (user) => {
-  return {
-    id: user.id || `user-${Math.random().toString(36).substr(2, 9)}`,
-    name: user.name || 'Unnamed User',
-    email: user.email || 'no-email@locvia.com',
-    phone: user.phone || 'N/A',
-    role: user.role || ROLES.CUSTOMER,
-    status: user.status || 'ACTIVE',
-    avatar: user.avatar || null,
-    shopId: user.shopId || null,
-    createdAt: user.createdAt || new Date().toISOString(),
-  };
+export const getAllUsers = async (params = {}) => {
+  return adminApi.getUsers(params);
 };
 
 /**
- * Retrieves all platform users from localStorage (returns [] when empty — no mock seed).
+ * Approves a SHOP_OWNER or DELIVERY_PARTNER account.
+ * PUT /api/admin/users/{id}/approve
+ * @param {string|number} userId
+ * @returns {Promise<Object>} Updated user
  */
-export const getAllUsers = () => {
-  try {
-    const raw = localStorage.getItem(USERS_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        return parsed.map(normalizeUser);
-      }
-    }
-  } catch (err) {
-    console.error('Error reading locvia_all_users from localStorage:', err);
-  }
-  return [];
+export const approveUser = async (userId) => {
+  return adminApi.approveUser(userId);
 };
 
 /**
- * Updates a user's status (e.g. ACTIVE <-> INACTIVE)
+ * Rejects a SHOP_OWNER or DELIVERY_PARTNER account.
+ * PUT /api/admin/users/{id}/reject
+ * @param {string|number} userId
+ * @returns {Promise<Object>} Updated user
  */
-export const updateUserStatus = (userId, newStatus) => {
-  const usersList = getAllUsers();
-  const updatedList = usersList.map((u) => {
-    if (u.id === userId) {
-      return { ...u, status: newStatus };
-    }
-    return u;
-  });
-
-  try {
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(updatedList));
-
-    const currentAuthRaw = localStorage.getItem('locvia_user');
-    if (currentAuthRaw) {
-      const currentAuthUser = JSON.parse(currentAuthRaw);
-      if (currentAuthUser && currentAuthUser.id === userId) {
-        const updatedAuthUser = { ...currentAuthUser, status: newStatus };
-        localStorage.setItem('locvia_user', JSON.stringify(updatedAuthUser));
-      }
-    }
-  } catch (err) {
-    console.error('Error updating user status in localStorage:', err);
-  }
-
-  return updatedList;
+export const rejectUser = async (userId) => {
+  return adminApi.rejectUser(userId);
 };
 
 /**
- * Calculates user statistics metrics
+ * Toggles a user's active status.
+ * PUT /api/admin/users/{id}
+ * @param {string|number} userId
+ * @param {boolean} active
+ * @returns {Promise<Object>} Updated user
+ */
+export const updateUserActiveStatus = async (userId, active) => {
+  return adminApi.updateUserStatus(userId, { active });
+};
+
+/**
+ * Calculates user statistics from a user list.
+ * @param {Array} users
+ * @returns {Object} stats
  */
 export const calculateUserStats = (users = []) => {
   const total = users.length;
   const customers = users.filter((u) => u.role === ROLES.CUSTOMER).length;
   const shopOwners = users.filter((u) => u.role === ROLES.SHOP_OWNER).length;
   const deliveryPartners = users.filter((u) => u.role === ROLES.DELIVERY_PARTNER).length;
-  const active = users.filter((u) => u.status === 'ACTIVE').length;
-  const inactive = users.filter((u) => u.status !== 'ACTIVE').length;
+  const activeUsers = users.filter((u) => u.active !== false).length;
+  const inactiveUsers = users.filter((u) => u.active === false).length;
+  const pendingApproval = users.filter(
+    (u) =>
+      (u.role === ROLES.SHOP_OWNER || u.role === ROLES.DELIVERY_PARTNER) &&
+      u.accountStatus === 'PENDING'
+  ).length;
 
   return {
-    total,
+    totalUsers: total,
     customers,
     shopOwners,
     deliveryPartners,
-    active,
-    inactive,
+    activeUsers,
+    inactiveUsers,
+    pendingApproval,
   };
 };
 
 /**
- * Generates user initials
+ * Generates user initials from name.
+ * @param {string} name
+ * @returns {string}
  */
 export const getUserInitials = (name = '') => {
   if (!name) return 'U';
@@ -105,7 +92,9 @@ export const getUserInitials = (name = '') => {
 };
 
 /**
- * Formats user joined date
+ * Formats a date string to a readable joined date.
+ * @param {string} dateStr
+ * @returns {string}
  */
 export const formatJoinedDate = (dateStr) => {
   if (!dateStr) return 'N/A';

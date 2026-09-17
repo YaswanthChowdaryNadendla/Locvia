@@ -4,8 +4,19 @@
 import axios from 'axios';
 import { normalizeApiError } from './errorHandler';
 
-// Base URL configured via environment variable with graceful fallback to localhost:8080
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+// Base URL configured via environment variable with production fallback to Render backend
+const getBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (import.meta.env.PROD) {
+    if (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
+      return 'https://locvia-backend.onrender.com/api';
+    }
+    return envUrl;
+  }
+  return envUrl || 'http://localhost:8080/api';
+};
+
+export const API_BASE_URL = getBaseUrl();
 
 /**
  * Checks whether real backend API calls are enabled.

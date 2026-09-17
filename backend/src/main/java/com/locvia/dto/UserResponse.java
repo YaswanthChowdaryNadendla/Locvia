@@ -1,5 +1,6 @@
 package com.locvia.dto;
 
+import com.locvia.entity.AccountStatus;
 import com.locvia.entity.User;
 import com.locvia.entity.UserRole;
 
@@ -16,6 +17,7 @@ public record UserResponse(
         String phone,
         UserRole role,
         Boolean active,
+        AccountStatus accountStatus,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
@@ -30,6 +32,7 @@ public record UserResponse(
                 user.getPhone(),
                 user.getRole(),
                 user.getActive() != null ? user.getActive() : true,
+                user.getAccountStatus() != null ? user.getAccountStatus() : AccountStatus.APPROVED,
                 user.getCreatedAt(),
                 user.getUpdatedAt()
         );

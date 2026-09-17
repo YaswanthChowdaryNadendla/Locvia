@@ -4,6 +4,7 @@ import com.locvia.dto.AuthResponse;
 import com.locvia.dto.LoginRequest;
 import com.locvia.dto.RegisterRequest;
 import com.locvia.dto.UserSummaryDto;
+import com.locvia.entity.AccountStatus;
 import com.locvia.entity.User;
 import com.locvia.entity.UserRole;
 import com.locvia.exception.EmailAlreadyExistsException;
@@ -42,6 +43,8 @@ public class AuthService {
     /**
      * Registers a new platform user with BCrypt password hashing.
      * Rejects attempts to publicly register with the ADMIN role.
+     * SHOP_OWNER and DELIVERY_PARTNER accounts are created with PENDING status
+     * and require Admin approval before performing operational actions.
      *
      * @param request registration payload
      * @return AuthResponse with JWT and safe user details
@@ -62,6 +65,14 @@ public class AuthService {
         // Default role is CUSTOMER if not specified
         UserRole assignedRole = request.getRole() != null ? request.getRole() : UserRole.CUSTOMER;
 
+        // Determine approval status based on role:
+        // SHOP_OWNER and DELIVERY_PARTNER must be approved by Admin before operating.
+        // CUSTOMER accounts are immediately active.
+        AccountStatus accountStatus = switch (assignedRole) {
+            case SHOP_OWNER, DELIVERY_PARTNER -> AccountStatus.PENDING;
+            default -> AccountStatus.APPROVED;
+        };
+
         String hashedPassword = passwordEncoder.encode(request.getPassword());
 
         String phone = request.getPhone() != null ? request.getPhone().trim() : null;
@@ -72,6 +83,7 @@ public class AuthService {
                 hashedPassword,
                 assignedRole
         );
+        user.setAccountStatus(accountStatus);
 
         User savedUser = userRepository.save(user);
 

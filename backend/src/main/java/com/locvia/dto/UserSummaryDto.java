@@ -1,11 +1,13 @@
 package com.locvia.dto;
 
+import com.locvia.entity.AccountStatus;
 import com.locvia.entity.User;
 import com.locvia.entity.UserRole;
 
 /**
  * Safe representation of a user account sent to the client.
  * Never includes passwords or security credentials.
+ * Includes accountStatus so the frontend can show pending-approval banners.
  */
 public class UserSummaryDto {
 
@@ -14,16 +16,19 @@ public class UserSummaryDto {
     private String email;
     private String phone;
     private UserRole role;
+    private AccountStatus accountStatus;
 
     public UserSummaryDto() {
     }
 
-    public UserSummaryDto(Long id, String name, String email, String phone, UserRole role) {
+    public UserSummaryDto(Long id, String name, String email, String phone,
+                          UserRole role, AccountStatus accountStatus) {
         this.id = id;
         this.name = name;
         this.email = email;
         this.phone = phone;
         this.role = role;
+        this.accountStatus = accountStatus;
     }
 
     public static UserSummaryDto fromEntity(User user) {
@@ -33,7 +38,8 @@ public class UserSummaryDto {
                 user.getName(),
                 user.getEmail(),
                 user.getPhone(),
-                user.getRole()
+                user.getRole(),
+                user.getAccountStatus() != null ? user.getAccountStatus() : AccountStatus.APPROVED
         );
     }
 
@@ -75,5 +81,13 @@ public class UserSummaryDto {
 
     public void setRole(UserRole role) {
         this.role = role;
+    }
+
+    public AccountStatus getAccountStatus() {
+        return accountStatus;
+    }
+
+    public void setAccountStatus(AccountStatus accountStatus) {
+        this.accountStatus = accountStatus;
     }
 }
