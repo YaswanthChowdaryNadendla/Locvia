@@ -32,7 +32,7 @@ import CustomerProfilePage from '../pages/customer/CustomerProfilePage';
 import LoginPage from '../pages/auth/LoginPage';
 
 import RegisterPage from '../pages/auth/RegisterPage';
-import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
+import ForgotPasswordPage from '../pages/auth/ForgotPasswordFlow';
 import PlaceholderPage from '../pages/PlaceholderPage';
 import { ROLES } from '../data/users';
 import { useAuth } from '../context/AuthContext';

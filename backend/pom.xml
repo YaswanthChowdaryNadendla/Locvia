@@ -114,6 +114,13 @@
             </exclusions>
         </dependency>
 
+        <!-- Resend Java SDK (Email OTP for Forgot Password) -->
+        <dependency>
+            <groupId>com.resend</groupId>
+            <artifactId>resend-java</artifactId>
+            <version>3.1.0</version>
+        </dependency>
+
         <!-- Spring Boot Starter Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
