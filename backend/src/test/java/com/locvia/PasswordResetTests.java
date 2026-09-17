@@ -228,4 +228,19 @@ class PasswordResetTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token", notNullValue()));
     }
+
+    @Test
+    @DisplayName("Resend OkHttp runtime compatibility: Emails.send executes without NoSuchMethodError")
+    void resendEmailService_OkHttpRuntimeCompatibility() {
+        ResendEmailService realService = new ResendEmailService("re_dummy_test_key", "noreply@locvia.com", "Locvia");
+        try {
+            realService.sendPasswordResetOtp("test@locvia.com", "123456");
+        } catch (com.locvia.exception.ExternalServiceException e) {
+            // Expected: dummy API key fails at Resend API gateway,
+            // but confirms okhttp3.MediaType.get(...) executed without NoSuchMethodError!
+            assertThat(e.getMessage()).contains("Failed to send password reset email");
+        } catch (Throwable t) {
+            assertThat(t).isNotInstanceOf(NoSuchMethodError.class);
+        }
+    }
 }
