@@ -7,6 +7,7 @@ import Footer from '../components/layout/Footer';
 import OfflineBanner from '../components/common/OfflineBanner';
 import InstallPrompt from '../components/common/InstallPrompt';
 import PWAUpdatePrompt from '../components/common/PWAUpdatePrompt';
+import BottomNavigation from '../components/layout/BottomNavigation';
 import { useAuth } from '../context/AuthContext';
 import { ROLES } from '../data/users';
 
@@ -38,6 +39,9 @@ const PublicLayout = ({ children, hideFooter = false, allowInternalRoles = false
 
       {/* PWA: update prompt */}
       <PWAUpdatePrompt />
+
+      {/* Mobile Bottom Navigation */}
+      {!hideFooter && <BottomNavigation />}
     </div>
   );
 };

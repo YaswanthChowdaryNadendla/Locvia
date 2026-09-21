@@ -1,5 +1,6 @@
 package com.locvia.security;
 
+import com.locvia.entity.AccountStatus;
 import com.locvia.entity.User;
 import com.locvia.entity.UserRole;
 import org.springframework.security.core.GrantedAuthority;
@@ -12,14 +13,19 @@ import java.util.List;
 /**
  * Spring Security {@link UserDetails} adapter wrapping the domain {@link User} entity.
  * Provides user identity, role-based authorities (prefixed with ROLE_), and account status.
+ * Stores phone and accountStatus so AuthService can build a complete response from the
+ * authenticated principal without issuing a redundant second database query.
  */
 public class CustomUserDetails implements UserDetails {
 
     private final Long id;
     private final String name;
     private final String email;
+    private final String phone;
     private final String password;
     private final UserRole role;
+    private final AccountStatus accountStatus;
+    private final boolean emailVerified;
     private final boolean active;
     private final Collection<? extends GrantedAuthority> authorities;
 
@@ -27,8 +33,11 @@ public class CustomUserDetails implements UserDetails {
         this.id = user.getId();
         this.name = user.getName();
         this.email = user.getEmail();
+        this.phone = user.getPhone();
         this.password = user.getPassword();
         this.role = user.getRole();
+        this.accountStatus = user.getAccountStatus() != null ? user.getAccountStatus() : AccountStatus.APPROVED;
+        this.emailVerified = user.getEmailVerified() != null ? user.getEmailVerified() : true;
         this.active = user.isActive();
         this.authorities = List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
     }
@@ -45,8 +54,20 @@ public class CustomUserDetails implements UserDetails {
         return email;
     }
 
+    public String getPhone() {
+        return phone;
+    }
+
     public UserRole getRole() {
         return role;
+    }
+
+    public AccountStatus getAccountStatus() {
+        return accountStatus;
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerified;
     }
 
     @Override

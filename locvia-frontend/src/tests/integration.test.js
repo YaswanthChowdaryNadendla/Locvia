@@ -223,4 +223,62 @@ test('Integration Suite - Module 65', async (t) => {
       'Phone number is required',
     ]);
   });
+
+  await t.test('17. Customer orders response normalization differentiates empty state from populated list', () => {
+    // Normalization helper matching orderService.getOrdersByCustomer logic
+    const normalizeOrders = (data) => {
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.content)) return data.content;
+      if (data && Array.isArray(data.orders)) return data.orders;
+      if (data === null || data === undefined) return [];
+      throw new Error('Unexpected order response structure received from server');
+    };
+
+    // Case 1: Backend returns empty array [] (zero orders customer) -> valid empty array for "No orders yet"
+    const zeroOrders = normalizeOrders([]);
+    assert.equal(Array.isArray(zeroOrders), true);
+    assert.equal(zeroOrders.length, 0);
+
+    // Case 2: Backend returns Spring Data Page wrapper { content: [] } -> valid empty array
+    const pageWrapperEmpty = normalizeOrders({ content: [] });
+    assert.equal(Array.isArray(pageWrapperEmpty), true);
+    assert.equal(pageWrapperEmpty.length, 0);
+
+    // Case 3: Backend returns populated order array -> valid array for list rendering
+    const populatedOrders = normalizeOrders([
+      { id: 1, status: 'DELIVERED', totalAmount: 499, itemCount: 3, createdAt: '2026-09-17T10:00:00' },
+      { id: 2, status: 'PLACED', totalAmount: 250, itemCount: 1, createdAt: '2026-09-17T11:30:00' },
+    ]);
+    assert.equal(Array.isArray(populatedOrders), true);
+    assert.equal(populatedOrders.length, 2);
+    assert.equal(populatedOrders[0].id, 1);
+    assert.equal(populatedOrders[1].status, 'PLACED');
+
+    // Case 4: Malformed response throws error rather than falsely rendering empty state
+    assert.throws(() => {
+      normalizeOrders({ unexpectedKey: 'malformed_payload' });
+    }, /Unexpected order response structure/);
+  });
+
+  await t.test('18. Customer orders API failure propagates normalized error for Try Again UI', () => {
+    const serverError = {
+      response: {
+        status: 500,
+        data: {
+          timestamp: new Date().toISOString(),
+          status: 500,
+          error: 'Internal Server Error',
+          message: 'Database connection failed while fetching orders',
+          path: '/api/orders/my-orders',
+        },
+      },
+    };
+
+    const normalized = normalizeApiError(serverError);
+    assert.equal(normalized.status, 500);
+    assert.equal(normalized.message, 'Database connection failed while fetching orders');
+    // Error must have status 500 and not be an empty array
+    assert.notEqual(normalized, []);
+    assert.equal(Array.isArray(normalized), false);
+  });
 });

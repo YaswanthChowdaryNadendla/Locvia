@@ -5,11 +5,15 @@ import com.locvia.dto.ForgotPasswordRequest;
 import com.locvia.dto.LoginRequest;
 import com.locvia.dto.MessageResponse;
 import com.locvia.dto.RegisterRequest;
+import com.locvia.dto.RegisterResponse;
+import com.locvia.dto.ResendVerificationRequest;
 import com.locvia.dto.ResetPasswordRequest;
 import com.locvia.dto.UserSummaryDto;
+import com.locvia.dto.VerifyEmailRequest;
 import com.locvia.dto.VerifyOtpRequest;
 import com.locvia.dto.VerifyOtpResponse;
 import com.locvia.service.AuthService;
+import com.locvia.service.EmailVerificationService;
 import com.locvia.service.PasswordResetService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -21,18 +25,23 @@ import java.security.Principal;
 /**
  * Controller providing REST API endpoints for user authentication:
  * public registration, public login, protected current-user profile check,
- * and the three-step public password-reset flow (OTP via Resend email).
+ * email OTP verification, and the three-step public password-reset flow (OTP via Resend email).
  */
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    private final AuthService          authService;
-    private final PasswordResetService passwordResetService;
+    private final AuthService              authService;
+    private final PasswordResetService     passwordResetService;
+    private final EmailVerificationService emailVerificationService;
 
-    public AuthController(AuthService authService, PasswordResetService passwordResetService) {
-        this.authService          = authService;
-        this.passwordResetService = passwordResetService;
+    public AuthController(
+            AuthService authService,
+            PasswordResetService passwordResetService,
+            EmailVerificationService emailVerificationService) {
+        this.authService              = authService;
+        this.passwordResetService     = passwordResetService;
+        this.emailVerificationService = emailVerificationService;
     }
 
     /**
@@ -40,12 +49,39 @@ public class AuthController {
      * POST /api/auth/register
      *
      * @param request registration details
-     * @return AuthResponse with JWT and safe user details
+     * @return RegisterResponse indicating email verification is required
      */
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        AuthResponse response = authService.register(request);
+    public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest request) {
+        RegisterResponse response = authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Public email verification endpoint.
+     * POST /api/auth/verify-email
+     *
+     * @param request email and 6-digit OTP
+     * @return MessageResponse confirming email verification
+     */
+    @PostMapping("/verify-email")
+    public ResponseEntity<MessageResponse> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        MessageResponse response = emailVerificationService.verifyEmail(request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Public endpoint to resend registration verification code.
+     * Enforces 60-second cooldown on the backend.
+     * POST /api/auth/resend-verification
+     *
+     * @param request recipient email
+     * @return MessageResponse confirming dispatch
+     */
+    @PostMapping("/resend-verification")
+    public ResponseEntity<MessageResponse> resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+        MessageResponse response = emailVerificationService.resendVerification(request);
+        return ResponseEntity.ok(response);
     }
 
     /**

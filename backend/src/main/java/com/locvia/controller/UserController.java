@@ -1,5 +1,7 @@
 package com.locvia.controller;
 
+import com.locvia.dto.ChangePasswordRequest;
+import com.locvia.dto.MessageResponse;
 import com.locvia.dto.UpdateUserRequest;
 import com.locvia.dto.UserResponse;
 import com.locvia.service.UserService;
@@ -50,6 +52,22 @@ public class UserController {
             @Valid @RequestBody UpdateUserRequest request) {
         UserResponse response = userService.updateCurrentUser(principal.getName(), request);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Changes password for the currently authenticated user.
+     * PUT /api/users/change-password (also supports POST)
+     *
+     * @param principal authenticated user principal from security context
+     * @param request   password change payload
+     * @return MessageResponse with success message
+     */
+    @RequestMapping(value = "/change-password", method = {RequestMethod.PUT, RequestMethod.POST})
+    public ResponseEntity<MessageResponse> changePassword(
+            Principal principal,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        userService.changePassword(principal.getName(), request);
+        return ResponseEntity.ok(new MessageResponse("Password changed successfully"));
     }
 
     /**

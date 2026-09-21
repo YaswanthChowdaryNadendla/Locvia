@@ -2,9 +2,9 @@
 // Module 6 — Authentication UI (Login Page)
 // Updated: Role selector added for all 4 Locvia user types.
 
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, AlertCircle, User, Store, Bike, ShieldCheck } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Eye, EyeOff, AlertCircle, CheckCircle2, Loader2, User, Store, Bike, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import heroImage from '../../assets/hero1.png';
 
@@ -45,17 +45,33 @@ const LoginPage = () => {
 
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState('');
+  // Shows a reassuring "waking up backend…" hint after 3.5s of loading
+  const [slowConnection, setSlowConnection] = useState(false);
+  const slowTimerRef = useRef(null);
 
   const { handleLogin, isLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [infoMessage, setInfoMessage] = useState(location.state?.message || '');
 
   // Current role config (for dynamic subtitle)
   const activeRole = ROLES.find((r) => r.value === selectedRole) || ROLES[0];
 
+  // Start / clear the slow-connection hint timer whenever loading state changes
+  useEffect(() => {
+    if (isLoading) {
+      slowTimerRef.current = setTimeout(() => setSlowConnection(true), 3500);
+    } else {
+      clearTimeout(slowTimerRef.current);
+      setSlowConnection(false);
+    }
+    return () => clearTimeout(slowTimerRef.current);
+  }, [isLoading]);
+
   const validate = () => {
     const newErrors = {};
     if (!identifier.trim()) {
-      newErrors.identifier = 'Mobile number or email is required';
+      newErrors.identifier = 'Email is required';
     }
     if (!password) {
       newErrors.password = 'Password is required';
@@ -66,6 +82,7 @@ const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setServerError('');
+    setInfoMessage('');
 
     const validationErrors = validate();
     if (Object.keys(validationErrors).length > 0) {
@@ -147,26 +164,49 @@ const LoginPage = () => {
           {/* Dynamic subtitle */}
           <p className="auth-subtitle">{activeRole.subtitle}</p>
 
+          {infoMessage && (
+            <div className="auth-success-banner" role="status" style={{ marginBottom: '1.25rem' }}>
+              <CheckCircle2 size={16} style={{ flexShrink: 0 }} />
+              <span>{infoMessage}</span>
+            </div>
+          )}
+
           {serverError && (
             <div className="auth-error-banner" role="alert">
-              <AlertCircle size={16} />
-              <span>{serverError}</span>
+              <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span>{serverError}</span>
+                {serverError.toLowerCase().includes('verify your email') && (
+                  <Link
+                    to={`/register?step=verify&email=${encodeURIComponent(identifier.trim())}`}
+                    style={{
+                      color: '#0c831f',
+                      fontWeight: 700,
+                      textDecoration: 'underline',
+                      fontSize: '12.5px',
+                      marginTop: '2px',
+                    }}
+                  >
+                    Verify your email now &rarr;
+                  </Link>
+                )}
+              </div>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="auth-form" noValidate>
             
-            {/* Mobile / Email field */}
+            {/* Email field */}
             <div className="auth-field">
               <label htmlFor="identifier" className="auth-label">
-                Mobile Number / Email
+                Email
               </label>
               <div className="auth-input-wrap">
                 <input
                   id="identifier"
-                  type="text"
+                  type="email"
                   className={`auth-input ${errors.identifier ? 'auth-input--error' : ''}`}
-                  placeholder="Enter mobile number or email"
+                  placeholder="Enter your email address"
                   value={identifier}
                   onChange={(e) => {
                     setIdentifier(e.target.value);
@@ -231,8 +271,22 @@ const LoginPage = () => {
 
             {/* Primary Submit */}
             <button type="submit" className="auth-btn-primary" disabled={isLoading}>
-              {isLoading ? 'Logging in...' : 'Login'}
+              {isLoading ? (
+                <span className="auth-btn-loading">
+                  <Loader2 size={16} className="auth-spinner" aria-hidden="true" />
+                  {slowConnection ? 'Starting up server, please wait…' : 'Logging in…'}
+                </span>
+              ) : (
+                'Login'
+              )}
             </button>
+
+            {/* Cold-start reassurance hint shown after 3.5s */}
+            {slowConnection && (
+              <p className="auth-slow-hint" role="status" aria-live="polite">
+                Our server is waking up — this takes about 30–50 seconds on the first request. Please wait.
+              </p>
+            )}
           </form>
 
           {/* Divider */}

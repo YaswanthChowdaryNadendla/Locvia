@@ -1,4 +1,4 @@
-﻿// src/services/api/endpoints.js
+// src/services/api/endpoints.js
 // Centralized Spring Boot REST API Endpoint definitions for Locvia
 
 export const ENDPOINTS = {
@@ -7,6 +7,8 @@ export const ENDPOINTS = {
     LOGIN: '/auth/login',
     REGISTER: '/auth/register',
     ME: '/auth/me',
+    VERIFY_EMAIL: '/auth/verify-email',
+    RESEND_VERIFICATION: '/auth/resend-verification',
     // Password reset flow (3-step, public)
     FORGOT_PASSWORD: '/auth/forgot-password',
     VERIFY_RESET_OTP: '/auth/verify-reset-otp',
@@ -18,6 +20,7 @@ export const ENDPOINTS = {
     ME: '/users/me',
     PROFILE: '/users/profile',
     UPDATE_PROFILE: '/users/me',
+    CHANGE_PASSWORD: '/users/change-password',
     BY_ID: (id) => `/users/${id}`,
   },
 

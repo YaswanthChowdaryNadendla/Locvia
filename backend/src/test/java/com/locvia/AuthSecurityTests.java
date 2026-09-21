@@ -54,6 +54,9 @@ class AuthSecurityTests {
     @Autowired
     private CustomUserDetailsService userDetailsService;
 
+    @Autowired
+    private com.locvia.repository.EmailVerificationOtpRepository emailVerificationOtpRepository;
+
     private static final List<String> TEST_EMAILS = List.of(
             "test.reg@example.com",
             "test.bcrypt@example.com",
@@ -71,6 +74,7 @@ class AuthSecurityTests {
     @AfterEach
     void cleanUpTestUsers() {
         for (String email : TEST_EMAILS) {
+            emailVerificationOtpRepository.findByEmail(email).ifPresent(emailVerificationOtpRepository::delete);
             userRepository.findByEmail(email).ifPresent(userRepository::delete);
         }
     }
@@ -86,7 +90,7 @@ class AuthSecurityTests {
     }
 
     @Test
-    @DisplayName("2. Registration creates user and returns JWT with safe user data")
+    @DisplayName("2. Registration creates user and returns email verification requirement")
     void registrationWorks() throws Exception {
         RegisterRequest request = new RegisterRequest(
                 "Test Registration",
@@ -100,11 +104,12 @@ class AuthSecurityTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.token").isString())
-                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.emailVerificationRequired").value(true))
+                .andExpect(jsonPath("$.email").value("test.reg@example.com"))
                 .andExpect(jsonPath("$.user.name").value("Test Registration"))
                 .andExpect(jsonPath("$.user.email").value("test.reg@example.com"))
                 .andExpect(jsonPath("$.user.role").value("CUSTOMER"))
+                .andExpect(jsonPath("$.token").doesNotExist())
                 .andExpect(jsonPath("$.user.password").doesNotExist())
                 .andExpect(jsonPath("$.password").doesNotExist());
     }
@@ -185,6 +190,12 @@ class AuthSecurityTests {
                         .content(objectMapper.writeValueAsString(regRequest)))
                 .andExpect(status().isCreated());
 
+        // Mark user email verified before logging in
+        userRepository.findByEmail("test.login@example.com").ifPresent(u -> {
+            u.setEmailVerified(true);
+            userRepository.save(u);
+        });
+
         LoginRequest loginRequest = new LoginRequest("test.login@example.com", "ValidPassword@123");
 
         mockMvc.perform(post("/api/auth/login")
@@ -212,6 +223,12 @@ class AuthSecurityTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(regRequest)))
                 .andExpect(status().isCreated());
+
+        // Mark user email verified so bad credentials check runs
+        userRepository.findByEmail("test.login@example.com").ifPresent(u -> {
+            u.setEmailVerified(true);
+            userRepository.save(u);
+        });
 
         LoginRequest badLogin = new LoginRequest("test.login@example.com", "WrongPassword@999");
 
@@ -241,13 +258,25 @@ class AuthSecurityTests {
                 UserRole.CUSTOMER
         );
 
-        MvcResult result = mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(regRequest)))
-                .andExpect(status().isCreated())
+                .andExpect(status().isCreated());
+
+        // Mark user email verified
+        User user = userRepository.findByEmail("test.me@example.com").orElseThrow();
+        user.setEmailVerified(true);
+        userRepository.save(user);
+
+        // Authenticate via login to obtain JWT token
+        LoginRequest loginReq = new LoginRequest("test.me@example.com", "ProfilePass@123");
+        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
                 .andReturn();
 
-        String responseBody = result.getResponse().getContentAsString();
+        String responseBody = loginResult.getResponse().getContentAsString();
         String token = objectMapper.readTree(responseBody).get("token").asText();
 
         mockMvc.perform(get("/api/auth/me")
@@ -356,6 +385,12 @@ class AuthSecurityTests {
                         .content(objectMapper.writeValueAsString(regRequest)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.user.email").value("test.normalization@example.com"));
+
+        // Mark user email verified so login succeeds
+        userRepository.findByEmail("test.normalization@example.com").ifPresent(u -> {
+            u.setEmailVerified(true);
+            userRepository.save(u);
+        });
 
         // Login with lowercase trimmed email
         LoginRequest loginLower = new LoginRequest("test.normalization@example.com", "NormalPass@123");

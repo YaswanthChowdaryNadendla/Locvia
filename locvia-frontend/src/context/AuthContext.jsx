@@ -75,7 +75,9 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     try {
       const result = await register(data);
-      setUser(result.user);
+      if (result?.token && result?.user) {
+        setUser(result.user);
+      }
       return result;
     } catch (err) {
       setError(err.message);

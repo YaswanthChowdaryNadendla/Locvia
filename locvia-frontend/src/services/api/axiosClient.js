@@ -29,7 +29,7 @@ export const isApiEnabled = () => {
 
 const axiosClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 45000,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',

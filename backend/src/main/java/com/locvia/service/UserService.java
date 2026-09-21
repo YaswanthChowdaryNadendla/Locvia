@@ -1,6 +1,7 @@
 package com.locvia.service;
 
 import com.locvia.dto.AdminUpdateUserRequest;
+import com.locvia.dto.ChangePasswordRequest;
 import com.locvia.dto.UpdateUserRequest;
 import com.locvia.dto.UserResponse;
 import com.locvia.entity.AccountStatus;
@@ -10,6 +11,7 @@ import com.locvia.exception.EmailAlreadyExistsException;
 import com.locvia.exception.ResourceNotFoundException;
 import com.locvia.repository.UserRepository;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,9 +25,11 @@ import java.util.List;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     /**
@@ -278,6 +282,50 @@ public class UserService {
         targetUser.setAccountStatus(AccountStatus.REJECTED);
         User updated = userRepository.save(targetUser);
         return UserResponse.fromEntity(updated);
+    }
+
+    /**
+     * Changes password for the currently authenticated user.
+     * Enforces current password verification via BCrypt, matches confirmation,
+     * validates password policy (minimum 6 characters), BCrypt-encodes the new password,
+     * and persists the update to the database.
+     *
+     * @param email   authenticated user's email from JWT principal
+     * @param request change password payload
+     */
+    @Transactional
+    public void changePassword(String email, ChangePasswordRequest request) {
+        User user = findUserByNormalizedEmail(email);
+
+        if (request.currentPassword() == null || request.currentPassword().isBlank()) {
+            throw new IllegalArgumentException("Current password is required");
+        }
+
+        if (request.newPassword() == null || request.newPassword().isBlank()) {
+            throw new IllegalArgumentException("New password is required");
+        }
+
+        if (request.confirmNewPassword() == null || request.confirmNewPassword().isBlank()) {
+            throw new IllegalArgumentException("Confirm new password is required");
+        }
+
+        if (request.newPassword().length() < 6) {
+            throw new IllegalArgumentException("Password must be at least 6 characters");
+        }
+
+        // Verify current password against stored BCrypt hash
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("Current password is incorrect.");
+        }
+
+        // Verify new password and confirmation match
+        if (!request.newPassword().equals(request.confirmNewPassword())) {
+            throw new IllegalArgumentException("New passwords do not match.");
+        }
+
+        // BCrypt-encode new password before saving — plaintext never stored
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
     }
 
     private User findUserByNormalizedEmail(String email) {

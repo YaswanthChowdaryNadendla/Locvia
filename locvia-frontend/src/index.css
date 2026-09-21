@@ -850,9 +850,9 @@ button {
   box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.10);
 }
 
-/* â”€â”€ Mobile navbar layout fixes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-/* Ensure the mobile layout container is flex-column and has NO fixed height */
-.hide-desktop {
+/* ── Mobile navbar layout fixes ──────────────────────────── */
+/* Ensure the mobile navbar layout container is flex-column and has NO fixed height */
+.locvia-navbar .hide-desktop {
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -3940,6 +3940,37 @@ body, #root {
   cursor: not-allowed;
 }
 
+/* Loading state inside primary button */
+.auth-btn-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+@keyframes auth-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.auth-spinner {
+  animation: auth-spin 0.9s linear infinite;
+  flex-shrink: 0;
+}
+
+/* Cold-start reassurance hint shown after 3.5s */
+.auth-slow-hint {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: #fefce8;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: #92400e;
+  text-align: center;
+  line-height: 1.5;
+}
+
 .auth-btn-secondary {
   width: 100%;
   height: 42px;
@@ -4055,6 +4086,114 @@ body, #root {
 .auth-success-icon {
   color: #0c831f;
   margin: 0 auto;
+}
+
+/* ── Email Verification & OTP Input Styles ── */
+.otp-boxes-wrap {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 1.5rem 0 1rem;
+}
+
+.otp-box-input {
+  width: 48px;
+  height: 56px;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 12px;
+  background: #ffffff;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.otp-box-input:focus {
+  border-color: #0c831f;
+  box-shadow: 0 0 0 3px rgba(12, 131, 31, 0.15);
+  background: #f8fafc;
+}
+
+.otp-box-input--filled {
+  border-color: #0c831f;
+  background: #f0fdf4;
+}
+
+.otp-box-input--error {
+  border-color: #ef4444 !important;
+  background: #fef2f2 !important;
+}
+
+@media (max-width: 440px) {
+  .otp-boxes-wrap {
+    gap: 6px;
+  }
+  .otp-box-input {
+    width: 42px;
+    height: 50px;
+    font-size: 1.25rem;
+    border-radius: 10px;
+  }
+}
+
+.auth-resend-wrap {
+  text-align: center;
+  margin-top: 1.25rem;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.auth-resend-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.auth-resend-btn:not(:disabled) {
+  color: #0c831f;
+}
+
+.auth-resend-btn:not(:disabled):hover {
+  text-decoration: underline;
+}
+
+.auth-resend-btn:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.auth-masked-email-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.9rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.auth-success-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  margin-bottom: 1rem;
 }
 
 /* ==========================================================================
@@ -13486,10 +13625,141 @@ body, #root {
     transform: none !important;
   }
 }
+/* ==========================================================================
+   LOCVIA MOBILE BOTTOM NAVIGATION (MODERN APP-STYLE HORIZONTAL BAR)
+   ========================================================================== */
 
+.locvia-bottom-nav {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  max-width: 100vw !important;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: space-around !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+  border-top: 1px solid rgba(229, 231, 235, 0.8) !important;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05) !important;
+  padding-top: 8px !important;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  margin: 0 !important;
+  z-index: 1000 !important;
+  box-sizing: border-box !important;
+}
 
+/* Hide on desktop viewports (>= 1024px) */
+@media (min-width: 1024px) {
+  .locvia-bottom-nav {
+    display: none !important;
+  }
+}
 
+.locvia-bottom-nav-item {
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  gap: 3px !important;
+  padding: 2px 0 !important;
+  min-height: 44px !important;
+  box-sizing: border-box !important;
+  -webkit-tap-highlight-color: transparent !important;
+  user-select: none !important;
+  transition: color 0.15s ease, transform 0.15s ease !important;
+}
 
+.locvia-bottom-nav-item:active {
+  transform: scale(0.93);
+}
+
+.locvia-bottom-nav-item.active {
+  color: var(--color-primary-dark, #16A34A) !important;
+}
+
+.locvia-bottom-nav-item.inactive {
+  color: var(--color-gray-500, #6B7280) !important;
+}
+
+.locvia-bottom-nav-icon-wrap {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 24px !important;
+  height: 24px !important;
+}
+
+.locvia-bottom-nav-badge {
+  position: absolute !important;
+  top: -4px !important;
+  right: -9px !important;
+  background-color: var(--color-primary-dark, #16A34A) !important;
+  color: #FFFFFF !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  border-radius: 9999px !important;
+  padding: 1px 4px !important;
+  min-width: 16px !important;
+  height: 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1.5px solid #FFFFFF !important;
+  box-sizing: border-box !important;
+  pointer-events: none !important;
+}
+
+.locvia-bottom-nav-label {
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+  letter-spacing: -0.01em !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
+  padding: 0 2px !important;
+  box-sizing: border-box !important;
+  display: block !important;
+  transition: color 0.15s ease !important;
+}
+
+.locvia-bottom-nav-item.active .locvia-bottom-nav-label {
+  font-weight: 600 !important;
+}
+
+/* Micro-screen optimization (e.g. 320px screens) */
+@media (max-width: 359px) {
+  .locvia-bottom-nav-label {
+    font-size: 10px !important;
+  }
+  .locvia-bottom-nav-item {
+    gap: 2px !important;
+  }
+}
+
+/* Page content clearance for fixed mobile bottom nav */
+@media (max-width: 1023px) {
+  .page-main {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .locvia-footer-bottom {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
 
 
 

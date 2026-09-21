@@ -64,15 +64,25 @@ export const getOrderById = async (id) => {
   }
 };
 
-// Retrieve orders for the authenticated customer
+// Retrieve orders for the authenticated customer from Spring Boot API
 export const getOrdersByCustomer = async (_userId) => {
-  try {
-    const orders = await orderApi.getMyOrders();
-    return Array.isArray(orders) ? orders : [];
-  } catch (err) {
-    console.error('Error fetching customer orders from API:', err);
+  const data = await orderApi.getMyOrders();
+  // Handle direct array response (e.g. List<OrderSummaryResponse> from Spring Boot)
+  if (Array.isArray(data)) {
+    return data;
+  }
+  // Handle Spring Data Page or wrapper response structures
+  if (data && Array.isArray(data.content)) {
+    return data.content;
+  }
+  if (data && Array.isArray(data.orders)) {
+    return data.orders;
+  }
+  // Handle 204 No Content or legitimate null/undefined empty result
+  if (data === null || data === undefined) {
     return [];
   }
+  throw new Error('Unexpected order response structure received from server');
 };
 
 // Service layer async helpers

@@ -49,6 +49,15 @@ public class User {
             columnDefinition = "VARCHAR(20) DEFAULT 'APPROVED'")
     private AccountStatus accountStatus = AccountStatus.APPROVED;
 
+    /**
+     * True if the user has completed email OTP verification.
+     * Newly registered users start with emailVerified = false.
+     * Column definition DEFAULT TRUE ensures existing database records are not broken.
+     */
+    @Column(name = "email_verified", nullable = false,
+            columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private Boolean emailVerified = true;
+
     public User() {
     }
 
@@ -153,5 +162,17 @@ public class User {
 
     public void setAccountStatus(AccountStatus accountStatus) {
         this.accountStatus = accountStatus;
+    }
+
+    public Boolean getEmailVerified() {
+        return emailVerified;
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerified != null && emailVerified;
+    }
+
+    public void setEmailVerified(Boolean emailVerified) {
+        this.emailVerified = emailVerified != null ? emailVerified : true;
     }
 }

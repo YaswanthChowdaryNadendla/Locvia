@@ -6,15 +6,15 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   Mail,
   Phone,
-  Edit2,
+  Lock,
+  Eye,
+  EyeOff,
   MapPin,
   ShoppingBag,
   ArrowRight,
   LogOut,
   X,
   CheckCircle2,
-  Calendar,
-  ShieldCheck,
   Building,
   Briefcase,
   Home as HomeIcon,
@@ -25,26 +25,31 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useAddress } from '../../context/AddressContext';
 import { getOrdersByCustomer } from '../../services/orderService';
+import { changePassword } from '../../services/api/userApi';
 import PageLoader from '../../components/common/loaders/PageLoader';
 import ButtonLoader from '../../components/common/loaders/ButtonLoader';
 
 export default function CustomerProfilePage() {
-  const { user, handleUpdateProfile, handleLogout } = useAuth();
+  const { user, handleLogout } = useAuth();
   const { addresses } = useAddress();
   const navigate = useNavigate();
 
   // Modal states
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
 
-  // Edit form state
-  const [formData, setFormData] = useState({
-    name: user?.name || '',
-    phone: user?.phone || '',
+  // Change Password state
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmNewPassword: '',
   });
-  const [formErrors, setFormErrors] = useState({});
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordErrors, setPasswordErrors] = useState({});
   const [successToast, setSuccessToast] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // Orders for current customer
   const userOrders = useMemo(() => {
@@ -61,66 +66,85 @@ export default function CustomerProfilePage() {
     return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
   }, [user?.name]);
 
-  // Format member since date
-  const memberSince = useMemo(() => {
-    if (!user?.createdAt) return 'Member since 2024';
-    try {
-      const d = new Date(user.createdAt);
-      return `Member since ${d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}`;
-    } catch {
-      return 'Member since 2024';
-    }
-  }, [user?.createdAt]);
-
-  // Handle Edit Open
-  const handleOpenEdit = () => {
-    setFormData({
-      name: user?.name || '',
-      phone: user?.phone || '',
+  // Handle Change Password Modal Open
+  const handleOpenChangePassword = () => {
+    setPasswordData({
+      currentPassword: '',
+      newPassword: '',
+      confirmNewPassword: '',
     });
-    setFormErrors({});
-    setIsEditModalOpen(true);
+    setPasswordErrors({});
+    setShowCurrentPassword(false);
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+    setIsChangePasswordModalOpen(true);
   };
 
-  // Form Validation
-  const validateForm = () => {
+  // Handle Change Password Modal Close
+  const handleCloseChangePassword = () => {
+    if (isChangingPassword) return;
+    setIsChangePasswordModalOpen(false);
+    setPasswordData({
+      currentPassword: '',
+      newPassword: '',
+      confirmNewPassword: '',
+    });
+    setPasswordErrors({});
+  };
+
+  // Password Form Validation
+  const validatePasswordForm = () => {
     const errors = {};
-    if (!formData.name.trim()) {
-      errors.name = 'Please enter your full name.';
-    } else if (formData.name.trim().length < 2) {
-      errors.name = 'Full name must be at least 2 characters.';
+    if (!passwordData.currentPassword.trim()) {
+      errors.currentPassword = 'Current password cannot be empty.';
     }
-
-    if (formData.phone.trim()) {
-      const cleanPhone = formData.phone.replace(/\s+/g, '');
-      const phoneRegex = /^[6-9]\d{9}$/;
-      if (!phoneRegex.test(cleanPhone)) {
-        errors.phone = 'Please enter a valid 10-digit Indian mobile number (e.g. 9876543210).';
-      }
+    if (!passwordData.newPassword) {
+      errors.newPassword = 'New password cannot be empty.';
+    } else if (passwordData.newPassword.length < 6) {
+      errors.newPassword = 'Password must be at least 6 characters.';
     }
-
-    setFormErrors(errors);
+    if (!passwordData.confirmNewPassword) {
+      errors.confirmNewPassword = 'Confirm password cannot be empty.';
+    } else if (passwordData.newPassword !== passwordData.confirmNewPassword) {
+      errors.confirmNewPassword = 'New passwords do not match.';
+    }
+    setPasswordErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  // Save Profile Changes
-  const handleSaveProfile = async (e) => {
+  // Submit Password Change to Backend
+  const handleChangePasswordSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm() || isSaving) return;
+    if (!validatePasswordForm() || isChangingPassword) return;
 
-    setIsSaving(true);
+    setIsChangingPassword(true);
+    setPasswordErrors({});
+
     try {
-      await handleUpdateProfile({
-        name: formData.name.trim(),
-        phone: formData.phone.trim(),
+      await changePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+        confirmNewPassword: passwordData.confirmNewPassword,
       });
-      setIsEditModalOpen(false);
-      setSuccessToast('Profile updated successfully!');
-      setTimeout(() => setSuccessToast(''), 3500);
+      setIsChangePasswordModalOpen(false);
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmNewPassword: '',
+      });
+      setSuccessToast('Password changed successfully.');
+      setTimeout(() => setSuccessToast(''), 4000);
     } catch (err) {
-      setFormErrors({ submit: err.message || 'Failed to update profile.' });
+      const errMsg = err?.message || 'Unable to change password. Please try again.';
+      if (errMsg.toLowerCase().includes('current password')) {
+        setPasswordErrors({ currentPassword: 'Current password is incorrect.', submit: 'Current password is incorrect.' });
+      } else if (errMsg.toLowerCase().includes('not match')) {
+        setPasswordErrors({ confirmNewPassword: 'New passwords do not match.', submit: 'New passwords do not match.' });
+      } else {
+        setPasswordErrors({ submit: errMsg });
+      }
     } finally {
-      setIsSaving(false);
+      setIsChangingPassword(false);
     }
   };
 
@@ -199,18 +223,10 @@ export default function CustomerProfilePage() {
                     <span className="profile-detail-value">{user.phone ? `+91 ${user.phone}` : 'Not provided'}</span>
                   </div>
                 </div>
-
-                <div className="profile-detail-item">
-                  <Calendar size={18} className="profile-detail-icon" />
-                  <div className="profile-detail-content">
-                    <span className="profile-detail-label">Account Status</span>
-                    <span className="profile-detail-value">{memberSince}</span>
-                  </div>
-                </div>
               </div>
 
-              <button onClick={handleOpenEdit} className="profile-edit-btn">
-                <Edit2 size={16} /> Edit Profile
+              <button onClick={handleOpenChangePassword} className="profile-edit-btn">
+                <Lock size={16} /> Change Password
               </button>
             </div>
 
@@ -398,95 +414,206 @@ export default function CustomerProfilePage() {
 
       </div>
 
-      {/* ── Edit Profile Modal ────────────────────────────────────── */}
-      {isEditModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsEditModalOpen(false)}>
-          <div className="modal-content animate-scale-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '460px', padding: 0 }}>
-            
+      {/* ── Change Password Modal ────────────────────────────────────── */}
+      {isChangePasswordModalOpen && (
+        <div className="modal-backdrop" onClick={handleCloseChangePassword}>
+          <div
+            className="modal-content animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '460px',
+              width: '100%',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            }}
+          >
             <div className="modal-header">
-              <h3 className="modal-title">Edit Profile</h3>
-              <button onClick={() => setIsEditModalOpen(false)} className="modal-close-btn" aria-label="Close modal">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Lock size={18} style={{ color: '#0c831f' }} />
+                <h3 className="modal-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>
+                  Change Password
+                </h3>
+              </div>
+              <button
+                onClick={handleCloseChangePassword}
+                className="modal-close-btn"
+                aria-label="Close modal"
+                disabled={isChangingPassword}
+              >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveProfile} style={{ padding: '1.25rem 1.5rem' }}>
-              
-              {/* Full Name Input */}
-              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                <label className="form-label">Full Name *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => {
-                    setFormData((prev) => ({ ...prev, name: e.target.value }));
-                    if (formErrors.name) setFormErrors((prev) => ({ ...prev, name: null }));
-                  }}
-                  className={`form-input ${formErrors.name ? 'error' : ''}`}
-                  placeholder="Enter your full name"
-                  autoFocus
-                />
-                {formErrors.name && <p className="form-error-msg">{formErrors.name}</p>}
-              </div>
-
-              {/* Phone Input */}
-              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                <label className="form-label">Phone Number (10 digits)</label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => {
-                    setFormData((prev) => ({ ...prev, phone: e.target.value }));
-                    if (formErrors.phone) setFormErrors((prev) => ({ ...prev, phone: null }));
-                  }}
-                  className={`form-input ${formErrors.phone ? 'error' : ''}`}
-                  placeholder="e.g. 9876543210"
-                />
-                {formErrors.phone && <p className="form-error-msg">{formErrors.phone}</p>}
-              </div>
-
-              {/* Email Input (Disabled/Read-only) */}
-              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                  <label className="form-label" style={{ margin: 0 }}>Email Address</label>
-                  <span className="readonly-pill"><ShieldCheck size={12} /> Read-only</span>
-                </div>
-                <input
-                  type="email"
-                  value={user.email || ''}
-                  disabled
-                  className="form-input disabled"
-                />
-                <p style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)', marginTop: '0.35rem' }}>
-                  Email cannot be changed directly for security verification purposes.
-                </p>
-              </div>
-
-              {formErrors.submit && (
-                <div className="form-submit-error">
-                  <AlertCircle size={15} />
-                  <span>{formErrors.submit}</span>
+            <form onSubmit={handleChangePasswordSubmit} style={{ padding: '1.25rem 1.5rem' }} noValidate>
+              {passwordErrors.submit && (
+                <div className="form-submit-error" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#dc2626', fontSize: '13px' }}>
+                  <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                  <span>{passwordErrors.submit}</span>
                 </div>
               )}
 
-              {/* Form Buttons */}
-              <div className="modal-actions" style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-                <button type="button" onClick={() => setIsEditModalOpen(false)} disabled={isSaving} className="btn-secondary" style={{ padding: '0.6rem 1.25rem' }}>
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="btn-primary"
-                  style={{ padding: '0.6rem 1.5rem', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
-                >
-                  {isSaving && <ButtonLoader size="sm" color="white" />}
-                  <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
-                </button>
+              {/* Current Password Input */}
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label className="form-label" htmlFor="currentPassword">
+                  Current Password
+                </label>
+                <div className="auth-input-wrap">
+                  <input
+                    id="currentPassword"
+                    type={showCurrentPassword ? 'text' : 'password'}
+                    value={passwordData.currentPassword}
+                    onChange={(e) => {
+                      setPasswordData((prev) => ({ ...prev, currentPassword: e.target.value }));
+                      if (passwordErrors.currentPassword) setPasswordErrors((prev) => ({ ...prev, currentPassword: null, submit: null }));
+                    }}
+                    className={`form-input ${passwordErrors.currentPassword ? 'has-error' : ''}`}
+                    placeholder="Enter current password"
+                    autoComplete="current-password"
+                    disabled={isChangingPassword}
+                    style={{ paddingRight: '42px' }}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    className="auth-eye-btn"
+                    onClick={() => setShowCurrentPassword((prev) => !prev)}
+                    aria-label={showCurrentPassword ? 'Hide current password' : 'Show current password'}
+                    disabled={isChangingPassword}
+                    tabIndex={-1}
+                  >
+                    {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {passwordErrors.currentPassword && (
+                  <p className="form-error-msg" style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
+                    {passwordErrors.currentPassword}
+                  </p>
+                )}
               </div>
 
-            </form>
+              {/* New Password Input */}
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label className="form-label" htmlFor="newPassword">
+                  New Password
+                </label>
+                <div className="auth-input-wrap">
+                  <input
+                    id="newPassword"
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={passwordData.newPassword}
+                    onChange={(e) => {
+                      setPasswordData((prev) => ({ ...prev, newPassword: e.target.value }));
+                      if (passwordErrors.newPassword) setPasswordErrors((prev) => ({ ...prev, newPassword: null, submit: null }));
+                    }}
+                    className={`form-input ${passwordErrors.newPassword ? 'has-error' : ''}`}
+                    placeholder="Enter new password"
+                    autoComplete="new-password"
+                    disabled={isChangingPassword}
+                    style={{ paddingRight: '42px' }}
+                  />
+                  <button
+                    type="button"
+                    className="auth-eye-btn"
+                    onClick={() => setShowNewPassword((prev) => !prev)}
+                    aria-label={showNewPassword ? 'Hide new password' : 'Show new password'}
+                    disabled={isChangingPassword}
+                    tabIndex={-1}
+                  >
+                    {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {passwordErrors.newPassword && (
+                  <p className="form-error-msg" style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
+                    {passwordErrors.newPassword}
+                  </p>
+                )}
+              </div>
 
+              {/* Confirm New Password Input */}
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label" htmlFor="confirmNewPassword">
+                  Confirm New Password
+                </label>
+                <div className="auth-input-wrap">
+                  <input
+                    id="confirmNewPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={passwordData.confirmNewPassword}
+                    onChange={(e) => {
+                      setPasswordData((prev) => ({ ...prev, confirmNewPassword: e.target.value }));
+                      if (passwordErrors.confirmNewPassword) setPasswordErrors((prev) => ({ ...prev, confirmNewPassword: null, submit: null }));
+                    }}
+                    className={`form-input ${passwordErrors.confirmNewPassword ? 'has-error' : ''}`}
+                    placeholder="Re-enter new password"
+                    autoComplete="new-password"
+                    disabled={isChangingPassword}
+                    style={{ paddingRight: '42px' }}
+                  />
+                  <button
+                    type="button"
+                    className="auth-eye-btn"
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                    disabled={isChangingPassword}
+                    tabIndex={-1}
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {passwordErrors.confirmNewPassword && (
+                  <p className="form-error-msg" style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
+                    {passwordErrors.confirmNewPassword}
+                  </p>
+                )}
+              </div>
+
+              {/* Form Buttons */}
+              <div
+                className="modal-actions"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem',
+                  marginTop: '1.5rem',
+                }}
+              >
+                <button
+                  type="submit"
+                  disabled={isChangingPassword}
+                  className="btn-primary"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    fontSize: '14.5px',
+                    fontWeight: 700,
+                  }}
+                >
+                  {isChangingPassword && <ButtonLoader size="sm" color="white" />}
+                  <span>{isChangingPassword ? 'Changing Password...' : 'Change Password'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseChangePassword}
+                  disabled={isChangingPassword}
+                  className="btn-secondary"
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem 1.25rem',
+                    textAlign: 'center',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

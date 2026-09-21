@@ -9,17 +9,25 @@ import com.locvia.entity.User;
 import com.locvia.entity.UserRole;
 import com.locvia.exception.EmailAlreadyExistsException;
 import com.locvia.repository.UserRepository;
+import com.locvia.security.CustomUserDetails;
 import com.locvia.security.JwtService;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.locvia.dto.RegisterResponse;
+import com.locvia.exception.BusinessException;
+import org.springframework.http.HttpStatus;
+
 /**
- * Authentication service orchestrating registration, login, password hashing,
- * and JWT generation.
+ * Service orchestrating user authentication flows:
+ * public registration with BCrypt hashing and email verification OTP,
+ * login with credential validation and JWT issuance,
+ * and profile retrieval.
  */
 @Service
 public class AuthService {
@@ -28,29 +36,32 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final EmailVerificationService emailVerificationService;
 
     public AuthService(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
-            AuthenticationManager authenticationManager) {
+            AuthenticationManager authenticationManager,
+            EmailVerificationService emailVerificationService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
+        this.emailVerificationService = emailVerificationService;
     }
 
     /**
-     * Registers a new platform user with BCrypt password hashing.
+     * Registers a new platform user with BCrypt password hashing and emailVerified = false.
      * Rejects attempts to publicly register with the ADMIN role.
-     * SHOP_OWNER and DELIVERY_PARTNER accounts are created with PENDING status
-     * and require Admin approval before performing operational actions.
+     * SHOP_OWNER and DELIVERY_PARTNER accounts are created with PENDING status.
+     * Generates a 6-digit OTP and dispatches it via Resend for email verification.
      *
      * @param request registration payload
-     * @return AuthResponse with JWT and safe user details
+     * @return RegisterResponse indicating email verification is required
      */
     @Transactional
-    public AuthResponse register(RegisterRequest request) {
+    public RegisterResponse register(RegisterRequest request) {
         String normalizedEmail = normalizeEmail(request.getEmail());
 
         if (userRepository.existsByEmail(normalizedEmail)) {
@@ -84,20 +95,29 @@ public class AuthService {
                 assignedRole
         );
         user.setAccountStatus(accountStatus);
+        user.setEmailVerified(false);
 
         User savedUser = userRepository.save(user);
 
-        String token = jwtService.generateToken(
-                savedUser.getEmail(),
-                savedUser.getId(),
-                savedUser.getRole().name()
-        );
+        // Generate and dispatch verification OTP via Resend
+        emailVerificationService.generateAndSendOtp(savedUser.getEmail());
 
-        return new AuthResponse(token, UserSummaryDto.fromEntity(savedUser));
+        return new RegisterResponse(
+                "Verification code sent to your email",
+                true,
+                savedUser.getEmail(),
+                UserSummaryDto.fromEntity(savedUser)
+        );
     }
 
     /**
      * Authenticates existing user credentials and issues a JWT token.
+     * The AuthenticationManager already loaded the user from the database via
+     * CustomUserDetailsService during DaoAuthenticationProvider.authenticate().
+     * We extract the principal directly from the returned Authentication object
+     * to avoid a redundant second WAN round-trip to Aiven MySQL.
+     *
+     * Enforces that the user has verified their email address before issuing a token.
      *
      * @param request login payload
      * @return AuthResponse with JWT and safe user details
@@ -106,21 +126,36 @@ public class AuthService {
     public AuthResponse login(LoginRequest request) {
         String normalizedEmail = normalizeEmail(request.getEmail());
 
-        // Perform authentication check via AuthenticationManager & DaoAuthenticationProvider
-        authenticationManager.authenticate(
+        // authenticate() loads + verifies the user; returns Authentication with CustomUserDetails principal
+        Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(normalizedEmail, request.getPassword())
         );
 
-        User user = userRepository.findByEmail(normalizedEmail)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + normalizedEmail));
+        // Extract user data from the authenticated principal (already loaded by DaoAuthenticationProvider)
+        CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
+
+        // Enforce email verification
+        if (!principal.isEmailVerified()) {
+            throw new BusinessException("Please verify your email before logging in.", HttpStatus.FORBIDDEN);
+        }
 
         String token = jwtService.generateToken(
-                user.getEmail(),
-                user.getId(),
-                user.getRole().name()
+                principal.getEmail(),
+                principal.getId(),
+                principal.getRole().name()
         );
 
-        return new AuthResponse(token, UserSummaryDto.fromEntity(user));
+        // Build UserSummaryDto from principal — no extra DB query needed
+        UserSummaryDto userSummary = new UserSummaryDto(
+                principal.getId(),
+                principal.getName(),
+                principal.getEmail(),
+                principal.getPhone(),
+                principal.getRole(),
+                principal.getAccountStatus()
+        );
+
+        return new AuthResponse(token, userSummary);
     }
 
     /**

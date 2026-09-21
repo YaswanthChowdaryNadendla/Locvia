@@ -1,8 +1,11 @@
-﻿// src/services/api/authApi.js
+// src/services/api/authApi.js
 // Authentication API service for Spring Boot backend integration.
 
 import axiosClient from './axiosClient';
 import { ENDPOINTS } from './endpoints';
+
+// Dedicated timeout for entry auth requests to accommodate Render free-tier cold starts (up to 55s)
+const AUTH_REQUEST_TIMEOUT = 60000;
 
 /**
  * Authenticates user credentials with Spring Boot backend.
@@ -12,7 +15,7 @@ import { ENDPOINTS } from './endpoints';
  * @returns {Promise<{ token: string, user: Object, redirectTo?: string }>}
  */
 export const login = async ({ email, password }) => {
-  return axiosClient.post(ENDPOINTS.AUTH.LOGIN, { email, password });
+  return axiosClient.post(ENDPOINTS.AUTH.LOGIN, { email, password }, { timeout: AUTH_REQUEST_TIMEOUT });
 };
 
 /**
@@ -26,7 +29,7 @@ export const login = async ({ email, password }) => {
  * @returns {Promise<{ token: string, user: Object, redirectTo?: string }>}
  */
 export const register = async (userData) => {
-  return axiosClient.post(ENDPOINTS.AUTH.REGISTER, userData);
+  return axiosClient.post(ENDPOINTS.AUTH.REGISTER, userData, { timeout: AUTH_REQUEST_TIMEOUT });
 };
 
 /**
@@ -62,7 +65,7 @@ export const refreshToken = async (refreshToken) => {
  * @returns {Promise<{ message: string }>}
  */
 export const forgotPassword = async ({ email }) => {
-  return axiosClient.post(ENDPOINTS.AUTH.FORGOT_PASSWORD, { email });
+  return axiosClient.post(ENDPOINTS.AUTH.FORGOT_PASSWORD, { email }, { timeout: AUTH_REQUEST_TIMEOUT });
 };
 
 /**
@@ -74,7 +77,7 @@ export const forgotPassword = async ({ email }) => {
  * @returns {Promise<{ resetToken: string, message: string }>}
  */
 export const verifyResetOtp = async ({ email, otp }) => {
-  return axiosClient.post(ENDPOINTS.AUTH.VERIFY_RESET_OTP, { email, otp });
+  return axiosClient.post(ENDPOINTS.AUTH.VERIFY_RESET_OTP, { email, otp }, { timeout: AUTH_REQUEST_TIMEOUT });
 };
 
 /**
@@ -86,7 +89,28 @@ export const verifyResetOtp = async ({ email, otp }) => {
  * @returns {Promise<{ message: string }>}
  */
 export const resetPassword = async ({ email, resetToken, newPassword }) => {
-  return axiosClient.post(ENDPOINTS.AUTH.RESET_PASSWORD, { email, resetToken, newPassword });
+  return axiosClient.post(ENDPOINTS.AUTH.RESET_PASSWORD, { email, resetToken, newPassword }, { timeout: AUTH_REQUEST_TIMEOUT });
+};
+
+/**
+ * Verifies email using 6-digit OTP code received after registration.
+ * @param {Object} payload
+ * @param {string} payload.email
+ * @param {string} payload.otp
+ * @returns {Promise<{ message: string }>}
+ */
+export const verifyEmail = async ({ email, otp }) => {
+  return axiosClient.post(ENDPOINTS.AUTH.VERIFY_EMAIL, { email, otp }, { timeout: AUTH_REQUEST_TIMEOUT });
+};
+
+/**
+ * Resends email verification 6-digit OTP code (backend enforces 60s cooldown).
+ * @param {Object} payload
+ * @param {string} payload.email
+ * @returns {Promise<{ message: string }>}
+ */
+export const resendVerification = async ({ email }) => {
+  return axiosClient.post(ENDPOINTS.AUTH.RESEND_VERIFICATION, { email }, { timeout: AUTH_REQUEST_TIMEOUT });
 };
 
 export default {
@@ -98,4 +122,6 @@ export default {
   forgotPassword,
   verifyResetOtp,
   resetPassword,
+  verifyEmail,
+  resendVerification,
 };

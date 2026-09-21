@@ -36,6 +36,12 @@ public class AdminAccountInitializer implements CommandLineRunner {
     public void run(String... args) {
         try {
             if (userRepository.existsByEmail(DEFAULT_ADMIN_EMAIL)) {
+                userRepository.findByEmail(DEFAULT_ADMIN_EMAIL).ifPresent(admin -> {
+                    if (admin.getEmailVerified() == null || !admin.getEmailVerified()) {
+                        admin.setEmailVerified(true);
+                        userRepository.save(admin);
+                    }
+                });
                 log.info("Default admin account already exists with email: {}", DEFAULT_ADMIN_EMAIL);
                 return;
             }
@@ -47,6 +53,7 @@ public class AdminAccountInitializer implements CommandLineRunner {
             admin.setRole(UserRole.ADMIN);
             admin.setActive(true);
             admin.setAccountStatus(AccountStatus.APPROVED);
+            admin.setEmailVerified(true);
 
             userRepository.save(admin);
             log.info("Successfully provisioned default admin account with email: {}", DEFAULT_ADMIN_EMAIL);

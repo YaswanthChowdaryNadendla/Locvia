@@ -17,18 +17,25 @@ public class UserSummaryDto {
     private String phone;
     private UserRole role;
     private AccountStatus accountStatus;
+    private Boolean emailVerified = true;
 
     public UserSummaryDto() {
     }
 
     public UserSummaryDto(Long id, String name, String email, String phone,
                           UserRole role, AccountStatus accountStatus) {
+        this(id, name, email, phone, role, accountStatus, true);
+    }
+
+    public UserSummaryDto(Long id, String name, String email, String phone,
+                          UserRole role, AccountStatus accountStatus, Boolean emailVerified) {
         this.id = id;
         this.name = name;
         this.email = email;
         this.phone = phone;
         this.role = role;
         this.accountStatus = accountStatus;
+        this.emailVerified = emailVerified != null ? emailVerified : true;
     }
 
     public static UserSummaryDto fromEntity(User user) {
@@ -39,7 +46,8 @@ public class UserSummaryDto {
                 user.getEmail(),
                 user.getPhone(),
                 user.getRole(),
-                user.getAccountStatus() != null ? user.getAccountStatus() : AccountStatus.APPROVED
+                user.getAccountStatus() != null ? user.getAccountStatus() : AccountStatus.APPROVED,
+                user.getEmailVerified() != null ? user.getEmailVerified() : true
         );
     }
 
@@ -89,5 +97,17 @@ public class UserSummaryDto {
 
     public void setAccountStatus(AccountStatus accountStatus) {
         this.accountStatus = accountStatus;
+    }
+
+    public Boolean getEmailVerified() {
+        return emailVerified;
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerified != null && emailVerified;
+    }
+
+    public void setEmailVerified(Boolean emailVerified) {
+        this.emailVerified = emailVerified != null ? emailVerified : true;
     }
 }

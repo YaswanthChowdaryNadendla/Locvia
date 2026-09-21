@@ -25,14 +25,19 @@ export const updateProfile = async (profileData) => {
 };
 
 /**
- * Changes user password.
+ * Changes authenticated user password.
  * @param {Object} payload
  * @param {string} payload.currentPassword
  * @param {string} payload.newPassword
- * @returns {Promise<{ success: boolean, message: string }>}
+ * @param {string} payload.confirmNewPassword
+ * @returns {Promise<{ message: string }>}
  */
-export const changePassword = async ({ currentPassword, newPassword }) => {
-  return axiosClient.post(ENDPOINTS.USERS.CHANGE_PASSWORD, { currentPassword, newPassword });
+export const changePassword = async ({ currentPassword, newPassword, confirmNewPassword }) => {
+  return axiosClient.put(ENDPOINTS.USERS.CHANGE_PASSWORD, {
+    currentPassword,
+    newPassword,
+    confirmNewPassword,
+  });
 };
 
 export default {
