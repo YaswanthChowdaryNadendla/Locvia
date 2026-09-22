@@ -19,6 +19,17 @@ export const login = async ({ email, password }) => {
 };
 
 /**
+ * Authenticates user using a verified Google Identity Services ID token.
+ * POST /api/auth/google { credential }
+ * @param {Object} payload
+ * @param {string} payload.credential - Google ID token JWT string
+ * @returns {Promise<{ token: string, user: Object }>}
+ */
+export const loginWithGoogle = async ({ credential }) => {
+  return axiosClient.post(ENDPOINTS.AUTH.GOOGLE, { credential }, { timeout: AUTH_REQUEST_TIMEOUT });
+};
+
+/**
  * Registers a new user account on the backend.
  * @param {Object} userData
  * @param {string} userData.name
@@ -115,6 +126,7 @@ export const resendVerification = async ({ email }) => {
 
 export default {
   login,
+  loginWithGoogle,
   register,
   logout,
   getCurrentUser,

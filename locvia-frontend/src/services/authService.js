@@ -53,6 +53,35 @@ export const login = async ({ email, password, selectedRole }) => {
   };
 };
 
+// ── Google Login ───────────────────────────────────────────────────────────
+/**
+ * Authenticates user credentials via Google Identity Services ID token.
+ * POST /api/auth/google { credential }
+ *
+ * @param {Object} payload
+ * @param {string} payload.credential
+ * @param {string} [payload.selectedRole]
+ * @returns {Promise<{ token: string, user: Object, redirectTo: string }>}
+ */
+export const loginWithGoogle = async ({ credential, selectedRole }) => {
+  const response = await authApi.loginWithGoogle({ credential });
+  const { token, user } = response;
+
+  if (selectedRole && user?.role && user.role !== selectedRole) {
+    const selectedLabel = ROLE_LABELS[selectedRole] || selectedRole;
+    throw new Error(`This account does not have ${selectedLabel} access.`);
+  }
+
+  localStorage.setItem('locvia_token', token);
+  localStorage.setItem('locvia_user', JSON.stringify(user));
+
+  return {
+    token,
+    user,
+    redirectTo: getRoleHomePath(user.role),
+  };
+};
+
 // ── Register ───────────────────────────────────────────────────────────────
 /**
  * Registers a new user account via the Spring Boot backend.

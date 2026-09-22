@@ -98,17 +98,18 @@ class PasswordResetTests {
     }
 
     @Test
-    @DisplayName("Step 1: Non-existent email returns same generic message (no user enumeration)")
-    void requestOtp_NonExistentEmail_ReturnsGenericMessage() throws Exception {
+    @DisplayName("Step 1: Non-existent email returns HTTP 404 with clear message")
+    void requestOtp_NonExistentEmail_ReturnsNotFound() throws Exception {
         ForgotPasswordRequest request = new ForgotPasswordRequest("doesnotexist@locvia.com");
 
         mockMvc.perform(post("/api/auth/forgot-password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message", containsString("If an account with that email exists")));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Email does not exist. Please create an account first."));
 
         verify(resendEmailService, never()).sendPasswordResetOtp(anyString(), anyString());
+        assertThat(otpRepository.findByEmail("doesnotexist@locvia.com")).isEmpty();
     }
 
     @Test

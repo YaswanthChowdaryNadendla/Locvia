@@ -5,6 +5,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import {
   login,
+  loginWithGoogle,
   logout,
   register,
   getCurrentUser,
@@ -69,6 +70,22 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  // ── Google Login ──────────────────────────────────────────────────────────
+  const handleGoogleLogin = useCallback(async (credential, selectedRole) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await loginWithGoogle({ credential, selectedRole });
+      setUser(result.user);
+      return result;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   // ── Register ──────────────────────────────────────────────────────────────
   const handleRegister = useCallback(async (data) => {
     setIsLoading(true);
@@ -114,6 +131,7 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated: !!user,
         isInitialized,
         handleLogin,
+        handleGoogleLogin,
         handleRegister,
         handleUpdateProfile,
         handleLogout,

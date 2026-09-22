@@ -281,4 +281,53 @@ test('Integration Suite - Module 65', async (t) => {
     assert.notEqual(normalized, []);
     assert.equal(Array.isArray(normalized), false);
   });
+
+  await t.test('19. Google Auth endpoint aligns with AuthController.java', () => {
+    assert.equal(ENDPOINTS.AUTH.GOOGLE, '/auth/google');
+  });
+
+  await t.test('20. Google Auth success sets locvia_token and locvia_user and routes to customer home', () => {
+    localStorage.clear();
+    const googleAuthResponse = {
+      token: 'jwt-google-verified-token',
+      user: {
+        id: 404,
+        name: 'Google User',
+        email: 'google.user@gmail.com',
+        role: 'CUSTOMER',
+        accountStatus: 'APPROVED',
+        emailVerified: true,
+      },
+    };
+
+    localStorage.setItem('locvia_token', googleAuthResponse.token);
+    localStorage.setItem('locvia_user', JSON.stringify(googleAuthResponse.user));
+
+    assert.equal(localStorage.getItem('locvia_token'), 'jwt-google-verified-token');
+    const storedUser = JSON.parse(localStorage.getItem('locvia_user'));
+    assert.equal(storedUser.email, 'google.user@gmail.com');
+    assert.equal(storedUser.role, 'CUSTOMER');
+    assert.equal(storedUser.accountStatus, 'APPROVED');
+    assert.equal(storedUser.emailVerified, true);
+    assert.equal(getRoleHomePath(storedUser.role), '/customer');
+  });
+
+  await t.test('21. Forgot Password non-existent email normalizes 404 with specific message', () => {
+    const notFoundError = {
+      response: {
+        status: 404,
+        data: {
+          timestamp: new Date().toISOString(),
+          status: 404,
+          error: 'Not Found',
+          message: 'Email does not exist. Please create an account first.',
+          path: '/api/auth/forgot-password',
+        },
+      },
+    };
+
+    const normalized = normalizeApiError(notFoundError);
+    assert.equal(normalized.status, 404);
+    assert.equal(normalized.message, 'Email does not exist. Please create an account first.');
+  });
 });

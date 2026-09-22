@@ -58,6 +58,13 @@ public class User {
             columnDefinition = "BOOLEAN DEFAULT TRUE")
     private Boolean emailVerified = true;
 
+    /**
+     * Stable Google Subject ID (sub claim) for Google-authenticated users.
+     * Nullable for standard email/password users; unique when populated.
+     */
+    @Column(name = "google_subject", unique = true, length = 100)
+    private String googleSubject;
+
     public User() {
     }
 
@@ -174,5 +181,13 @@ public class User {
 
     public void setEmailVerified(Boolean emailVerified) {
         this.emailVerified = emailVerified != null ? emailVerified : true;
+    }
+
+    public String getGoogleSubject() {
+        return googleSubject;
+    }
+
+    public void setGoogleSubject(String googleSubject) {
+        this.googleSubject = googleSubject;
     }
 }

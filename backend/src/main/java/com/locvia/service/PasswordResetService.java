@@ -72,20 +72,23 @@ public class PasswordResetService {
 
     /**
      * Initiates a password reset for the given email.
-     * Always returns the same generic message regardless of whether the email exists.
+     * Generates a 6-digit OTP and sends via Resend if the user exists.
+     * Throws BusinessException (HTTP 404) if the email does not exist in the database.
      *
      * @param request contains the email address
-     * @return generic success message (user enumeration safe)
+     * @return generic success message
+     * @throws BusinessException if email does not exist (404) or cooldown active (429)
      */
     @Transactional
     public MessageResponse requestOtp(ForgotPasswordRequest request) {
         String email = normalize(request.email());
 
-        // Check if user exists — if not, return generic message silently (no enumeration)
+        // Check if user exists — if not, return HTTP 404 with clear message
         Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isEmpty()) {
-            log.info("Password reset requested for non-existent email (suppressed): {}", email);
-            return new MessageResponse(GENERIC_OTP_MESSAGE);
+            log.info("Password reset requested for non-existent email: {}", email);
+            throw new BusinessException(
+                    "Email does not exist. Please create an account first.", HttpStatus.NOT_FOUND);
         }
 
         // Enforce 60-second resend cooldown

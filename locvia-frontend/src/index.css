@@ -4033,6 +4033,25 @@ body, #root {
   border-color: #94a3b8;
 }
 
+.auth-google-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 44px;
+}
+
+.auth-google-gis-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.auth-google-gis-container iframe {
+  margin: 0 auto !important;
+}
+
 .auth-google-icon {
   flex-shrink: 0;
 }

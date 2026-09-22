@@ -2,6 +2,7 @@ package com.locvia.controller;
 
 import com.locvia.dto.AuthResponse;
 import com.locvia.dto.ForgotPasswordRequest;
+import com.locvia.dto.GoogleAuthRequest;
 import com.locvia.dto.LoginRequest;
 import com.locvia.dto.MessageResponse;
 import com.locvia.dto.RegisterRequest;
@@ -94,6 +95,22 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Public Google authentication endpoint.
+     * POST /api/auth/google
+     *
+     * Validates Google ID token credential, resolves or creates user,
+     * and returns Locvia JWT with user summary.
+     *
+     * @param request Google credential
+     * @return AuthResponse with JWT and UserSummaryDto
+     */
+    @PostMapping("/google")
+    public ResponseEntity<AuthResponse> loginWithGoogle(@Valid @RequestBody GoogleAuthRequest request) {
+        AuthResponse response = authService.loginWithGoogle(request);
         return ResponseEntity.ok(response);
     }
 

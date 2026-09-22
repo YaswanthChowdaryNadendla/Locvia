@@ -1,4 +1,4 @@
-﻿// src/pages/auth/ForgotPasswordFlow.jsx
+// src/pages/auth/ForgotPasswordFlow.jsx
 // Module 6 - Authentication UI (Forgot Password - Full Production Flow)
 // 3-step password recovery: Email -> OTP -> New Password -> Success
 // This file replaces ForgotPasswordPage.jsx for the full Resend OTP flow.
@@ -17,6 +17,7 @@ const ForgotPasswordFlow = () => {
   const [email, setEmail]                     = useState('');
   const [resetToken, setResetToken]           = useState('');
   const [error, setError]                     = useState('');
+  const [isEmailNotFound, setIsEmailNotFound] = useState(false);
   const [isLoading, setIsLoading]             = useState(false);
   const [otp, setOtp]                         = useState('');
   const [cooldown, setCooldown]               = useState(0);
@@ -42,6 +43,7 @@ const ForgotPasswordFlow = () => {
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setIsEmailNotFound(false);
     const trimmedEmail = email.trim();
     if (!trimmedEmail) { setError('Email is required.'); return; }
     if (!isValidEmail(trimmedEmail)) { setError('Please enter a valid email address.'); return; }
@@ -51,7 +53,14 @@ const ForgotPasswordFlow = () => {
       startCooldown();
       setStep('otp');
     } catch (err) {
-      setError(err?.response?.data?.message || 'Something went wrong. Please try again.');
+      const isNotFound = err?.status === 404 || err?.response?.status === 404;
+      if (isNotFound) {
+        setIsEmailNotFound(true);
+        setError(err?.message || err?.response?.data?.message || 'Email does not exist. Please create an account first.');
+      } else {
+        setIsEmailNotFound(false);
+        setError(err?.message || err?.response?.data?.message || 'Something went wrong. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -113,7 +122,7 @@ const ForgotPasswordFlow = () => {
   ) : null;
 
   const resetFlow = () => {
-    setStep('email'); setError(''); setOtp('');
+    setStep('email'); setError(''); setOtp(''); setIsEmailNotFound(false);
     setNewPassword(''); setConfirmPassword('');
   };
 
@@ -155,7 +164,7 @@ const ForgotPasswordFlow = () => {
                       className={`auth-input ${error ? 'auth-input--error' : ''}`}
                       placeholder="Enter your email address"
                       value={email}
-                      onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                      onChange={(e) => { setEmail(e.target.value); setError(''); setIsEmailNotFound(false); }}
                       autoComplete="email" autoFocus />
                   </div>
                 </div>
@@ -163,6 +172,24 @@ const ForgotPasswordFlow = () => {
                   {isLoading ? 'Sending...' : 'Send Verification Code'}
                 </button>
               </form>
+
+              {isEmailNotFound && (
+                <div style={{ marginTop: '1rem' }}>
+                  <Link
+                    to="/register"
+                    className="auth-btn-secondary"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textDecoration: 'none',
+                      width: '100%',
+                    }}
+                  >
+                    Create Account
+                  </Link>
+                </div>
+              )}
             </>
           )}
 

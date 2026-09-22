@@ -22,6 +22,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
 
     /**
+     * Finds a user by their unique Google Subject ID.
+     *
+     * @param googleSubject stable Google subject ID
+     * @return Optional containing the User if found, otherwise empty
+     */
+    Optional<User> findByGoogleSubject(String googleSubject);
+
+    /**
      * Checks if a user already exists with the given email address.
      *
      * @param email normalized email address
