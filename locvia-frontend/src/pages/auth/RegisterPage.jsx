@@ -3,10 +3,46 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Eye, EyeOff, AlertCircle, Mail, CheckCircle2, Loader2, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, Mail, CheckCircle2, Loader2, ArrowLeft, User, Store, Bike, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { verifyEmail, resendVerification } from '../../services/api/authApi';
+import { verifySignupEmail, resendSignupOtp } from '../../services/api/authApi';
 import heroImage from '../../assets/hero1.png';
+
+// ── Supported Public Signup Roles & Configuration ────────────────────────────
+const SIGNUP_ROLES = [
+  {
+    value: 'CUSTOMER',
+    label: 'Customer',
+    Icon: User,
+    heading: 'Create your Customer account',
+    subtitle: 'Join Locvia and shop from trusted local stores.',
+    buttonText: 'Create Customer Account',
+  },
+  {
+    value: 'SHOP_OWNER',
+    label: 'Shop Owner',
+    Icon: Store,
+    heading: 'Create your Shop Owner account',
+    subtitle: 'Register your store and start selling on Locvia.',
+    buttonText: 'Create Shop Owner Account',
+  },
+  {
+    value: 'DELIVERY_PARTNER',
+    label: 'Delivery Partner',
+    Icon: Bike,
+    heading: 'Create your Delivery Partner account',
+    subtitle: 'Join Locvia and deliver orders from local stores.',
+    buttonText: 'Create Delivery Partner Account',
+  },
+  {
+    value: 'ADMIN',
+    label: 'Admin',
+    Icon: ShieldCheck,
+    heading: 'Admin Account',
+    subtitle: '',
+    buttonText: '',
+  },
+];
 
 /**
  * Safely masks email for display: user@example.com -> u***@example.com
@@ -22,6 +58,12 @@ const RegisterPage = () => {
   const [searchParams] = useSearchParams();
   const queryEmail = searchParams.get('email') || '';
   const isQueryVerify = searchParams.get('step') === 'verify' && Boolean(queryEmail);
+
+  // Read initial role from URL query param if valid, else default to CUSTOMER
+  const roleParam = (searchParams.get('role') || '').toUpperCase();
+  const initialRole = SIGNUP_ROLES.some((r) => r.value === roleParam) ? roleParam : 'CUSTOMER';
+  const [selectedRole, setSelectedRole] = useState(initialRole);
+  const [registeredRole, setRegisteredRole] = useState(initialRole);
 
   // Flow step: 'form' | 'verify'
   const [step, setStep] = useState(isQueryVerify ? 'verify' : 'form');
@@ -46,6 +88,7 @@ const RegisterPage = () => {
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [verifyError, setVerifyError] = useState('');
   const [verifySuccess, setVerifySuccess] = useState(false);
+  const [verifySuccessMessage, setVerifySuccessMessage] = useState('');
 
   // 60-second Resend cooldown state
   const [cooldown, setCooldown] = useState(isQueryVerify ? 60 : 0);
@@ -55,6 +98,8 @@ const RegisterPage = () => {
 
   const { handleRegister, isLoading } = useAuth();
   const navigate = useNavigate();
+
+  const activeRole = SIGNUP_ROLES.find((r) => r.value === selectedRole) || SIGNUP_ROLES[0];
 
   useEffect(() => {
     if (isQueryVerify) {
@@ -115,6 +160,11 @@ const RegisterPage = () => {
     e.preventDefault();
     setServerError('');
 
+    if (selectedRole === 'ADMIN') {
+      setServerError('Admin accounts cannot be created via public registration.');
+      return;
+    }
+
     const validationErrors = validate();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
@@ -128,10 +178,12 @@ const RegisterPage = () => {
         email: email.trim(),
         phone: mobileNumber.trim(),
         password,
+        role: selectedRole,
       });
 
       if (result?.emailVerificationRequired) {
         setRegisteredEmail(result.email || email.trim());
+        setRegisteredRole(selectedRole);
         setStep('verify');
         setOtpDigits(['', '', '', '', '', '']);
         setVerifyError('');
@@ -216,18 +268,27 @@ const RegisterPage = () => {
     setVerifyLoading(true);
 
     try {
-      await verifyEmail({
+      const res = await verifySignupEmail({
         email: registeredEmail,
         otp: fullOtp,
       });
 
+      const defaultMsg =
+        registeredRole === 'SHOP_OWNER'
+          ? 'Email verified successfully. Your Shop Owner account has been created and is pending admin approval.'
+          : registeredRole === 'DELIVERY_PARTNER'
+          ? 'Email verified successfully. Your Delivery Partner account has been created and is pending admin approval.'
+          : 'Email verified successfully. Your Customer account has been created. You can now login.';
+
+      const successMsg = res?.message || defaultMsg;
+      setVerifySuccessMessage(successMsg);
       setVerifySuccess(true);
       setTimeout(() => {
         navigate('/login', {
           replace: true,
-          state: { message: 'Email verified successfully! Please log in to continue.' },
+          state: { message: successMsg },
         });
-      }, 1500);
+      }, 1800);
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Invalid verification code.';
       setVerifyError(msg);
@@ -244,7 +305,7 @@ const RegisterPage = () => {
     setResendLoading(true);
 
     try {
-      const res = await resendVerification({ email: registeredEmail });
+      const res = await resendSignupOtp({ email: registeredEmail });
       setResendFeedback(res?.message || 'New verification code sent to your email.');
       startCooldown();
       setOtpDigits(['', '', '', '', '', '']);
@@ -299,7 +360,7 @@ const RegisterPage = () => {
                     Email Verified!
                   </h2>
                   <p className="auth-subtitle" style={{ marginBottom: '1.5rem' }}>
-                    Your email address has been successfully verified. Redirecting to login...
+                    {verifySuccessMessage || 'Your email address has been successfully verified. Redirecting to login...'}
                   </p>
                   <div style={{ display: 'flex', justifyContent: 'center' }}>
                     <Loader2 size={24} className="auth-spinner" color="#16a34a" />
@@ -325,15 +386,15 @@ const RegisterPage = () => {
                   </div>
 
                   <h1 className="auth-title" style={{ textAlign: 'center' }}>
-                    Verify Your Email
+                    Verify your email
                   </h1>
                   <p className="auth-subtitle" style={{ textAlign: 'center', marginBottom: '0.75rem' }}>
-                    We\'ve sent a 6-digit verification code to:
+                    We've sent a 6-digit verification code to
                   </p>
 
-                  <div style={{ textAlign: 'center' }}>
+                  <div style={{ textAlign: 'center', marginBottom: '0.75rem' }}>
                     <div className="auth-masked-email-box">
-                      <span>{maskEmail(registeredEmail)}</span>
+                      <span>{registeredEmail}</span>
                     </div>
                   </div>
 
@@ -353,7 +414,7 @@ const RegisterPage = () => {
 
                   <form onSubmit={handleVerifyOtp} className="auth-form" noValidate>
                     <label className="auth-label" style={{ textAlign: 'center', display: 'block' }}>
-                      Verification code
+                      Enter the 6-digit verification code sent to your email.
                     </label>
 
                     <div className="otp-boxes-wrap" onPaste={handleOtpPaste}>
@@ -397,10 +458,10 @@ const RegisterPage = () => {
 
                   {/* Resend section */}
                   <div className="auth-resend-wrap">
-                    <p style={{ margin: '0 0 4px', color: '#64748b' }}>Didn\'t receive the code?</p>
+                    <p style={{ margin: '0 0 4px', color: '#64748b' }}>Didn't receive the code?</p>
                     {cooldown > 0 ? (
                       <span style={{ color: '#94a3af', fontWeight: 600 }}>
-                        Resend code in {cooldown}s
+                        Resend available in {cooldown}s
                       </span>
                     ) : (
                       <button
@@ -435,161 +496,229 @@ const RegisterPage = () => {
             </div>
           ) : (
             <>
-              <h1 className="auth-title">Create your account</h1>
-              <p className="auth-subtitle">Join Locvia and shop from trusted local stores.</p>
-
-              {serverError && (
-                <div className="auth-error-banner" role="alert">
-                  <AlertCircle size={16} />
-                  <span>{serverError}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="auth-form" noValidate>
-                {/* Full Name */}
-                <div className="auth-field">
-                  <label htmlFor="fullName" className="auth-label">
-                    Full Name
-                  </label>
-                  <div className="auth-input-wrap">
-                    <input
-                      id="fullName"
-                      type="text"
-                      className={`auth-input ${errors.fullName ? 'auth-input--error' : ''}`}
-                      placeholder="e.g. Rahul Sharma"
-                      value={fullName}
-                      onChange={(e) => {
-                        setFullName(e.target.value);
-                        if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: null }));
-                      }}
-                      autoComplete="name"
-                    />
-                  </div>
-                  {errors.fullName && <span className="auth-field-error">{errors.fullName}</span>}
-                </div>
-
-                {/* Mobile Number */}
-                <div className="auth-field">
-                  <label htmlFor="mobileNumber" className="auth-label">
-                    Mobile Number
-                  </label>
-                  <div className="auth-input-wrap">
-                    <input
-                      id="mobileNumber"
-                      type="tel"
-                      className={`auth-input ${errors.mobileNumber ? 'auth-input--error' : ''}`}
-                      placeholder="e.g. +91 9876543210"
-                      value={mobileNumber}
-                      onChange={(e) => {
-                        setMobileNumber(e.target.value);
-                        if (errors.mobileNumber) setErrors((prev) => ({ ...prev, mobileNumber: null }));
-                      }}
-                      autoComplete="tel"
-                    />
-                  </div>
-                  {errors.mobileNumber && <span className="auth-field-error">{errors.mobileNumber}</span>}
-                </div>
-
-                {/* Email Address */}
-                <div className="auth-field">
-                  <label htmlFor="email" className="auth-label">
-                    Email
-                  </label>
-                  <div className="auth-input-wrap">
-                    <input
-                      id="email"
-                      type="email"
-                      className={`auth-input ${errors.email ? 'auth-input--error' : ''}`}
-                      placeholder="e.g. rahul@example.com"
-                      value={email}
-                      onChange={(e) => {
-                        setEmail(e.target.value);
-                        if (errors.email) setErrors((prev) => ({ ...prev, email: null }));
-                      }}
-                      autoComplete="email"
-                    />
-                  </div>
-                  {errors.email && <span className="auth-field-error">{errors.email}</span>}
-                </div>
-
-                {/* Password */}
-                <div className="auth-field">
-                  <label htmlFor="password" className="auth-label">
-                    Password
-                  </label>
-                  <div className="auth-input-wrap">
-                    <input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      className={`auth-input ${errors.password ? 'auth-input--error' : ''}`}
-                      placeholder="Min 6 characters"
-                      value={password}
-                      onChange={(e) => {
-                        setPassword(e.target.value);
-                        if (errors.password) setErrors((prev) => ({ ...prev, password: null }));
-                      }}
-                      autoComplete="new-password"
-                    />
+              {/* ── Role Selector ── */}
+              <div className="role-selector" role="group" aria-label="Account Type">
+                <p className="role-selector__label">Account Type</p>
+                <div className="role-selector__grid">
+                  {SIGNUP_ROLES.map(({ value, label, Icon }) => (
                     <button
+                      key={value}
                       type="button"
-                      className="auth-eye-btn"
-                      onClick={() => setShowPassword((prev) => !prev)}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                  {errors.password && <span className="auth-field-error">{errors.password}</span>}
-                </div>
-
-                {/* Confirm Password */}
-                <div className="auth-field">
-                  <label htmlFor="confirmPassword" className="auth-label">
-                    Confirm Password
-                  </label>
-                  <div className="auth-input-wrap">
-                    <input
-                      id="confirmPassword"
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      className={`auth-input ${errors.confirmPassword ? 'auth-input--error' : ''}`}
-                      placeholder="Re-enter password"
-                      value={confirmPassword}
-                      onChange={(e) => {
-                        setConfirmPassword(e.target.value);
-                        if (errors.confirmPassword) setErrors((prev) => ({ ...prev, confirmPassword: null }));
+                      className={`role-option-btn${selectedRole === value ? ' role-option-btn--active' : ''}`}
+                      onClick={() => {
+                        setSelectedRole(value);
+                        setServerError('');
                       }}
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      className="auth-eye-btn"
-                      onClick={() => setShowConfirmPassword((prev) => !prev)}
-                      aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                      aria-pressed={selectedRole === value}
+                      aria-label={`Select ${label}`}
+                      disabled={isLoading}
                     >
-                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      <Icon size={18} aria-hidden="true" />
+                      <span>{label}</span>
                     </button>
-                  </div>
-                  {errors.confirmPassword && <span className="auth-field-error">{errors.confirmPassword}</span>}
+                  ))}
                 </div>
-
-                {/* Primary Submit */}
-                <button
-                  type="submit"
-                  className="auth-btn-primary"
-                  style={{ marginTop: '0.4rem' }}
-                  disabled={isLoading}
-                >
-                  {isLoading ? 'Creating Account...' : 'Create Account'}
-                </button>
-              </form>
-
-              {/* Login Link */}
-              <div className="auth-footer-text">
-                <span>Already have an account?</span>{' '}
-                <Link to="/login" className="auth-link-bold">
-                  Login
-                </Link>
               </div>
+
+              {selectedRole === 'ADMIN' ? (
+                <div className="auth-admin-restriction" style={{ textAlign: 'center', padding: '1.5rem 0' }}>
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '56px',
+                      height: '56px',
+                      borderRadius: '50%',
+                      background: '#fef2f2',
+                      color: '#dc2626',
+                      marginBottom: '1rem',
+                    }}
+                  >
+                    <ShieldCheck size={28} />
+                  </div>
+                  <h2 className="auth-title" style={{ fontSize: '1.25rem', marginBottom: '0.75rem', color: '#1e293b' }}>
+                    Admin accounts cannot be created here.
+                  </h2>
+                  <p className="auth-subtitle" style={{ marginBottom: '1.5rem', color: '#64748b' }}>
+                    Admin accounts are created and managed by the Locvia system administrator.
+                  </p>
+                  <button
+                    type="button"
+                    className="auth-btn-secondary"
+                    onClick={() => {
+                      setSelectedRole('CUSTOMER');
+                      setServerError('');
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '100%',
+                    }}
+                  >
+                    Back to Account Types
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <h1 className="auth-title">{activeRole.heading}</h1>
+                  <p className="auth-subtitle">{activeRole.subtitle}</p>
+
+                  {serverError && (
+                    <div className="auth-error-banner" role="alert">
+                      <AlertCircle size={16} />
+                      <span>{serverError}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSubmit} className="auth-form" noValidate>
+                    {/* Full Name */}
+                    <div className="auth-field">
+                      <label htmlFor="fullName" className="auth-label">
+                        Full Name
+                      </label>
+                      <div className="auth-input-wrap">
+                        <input
+                          id="fullName"
+                          type="text"
+                          className={`auth-input ${errors.fullName ? 'auth-input--error' : ''}`}
+                          placeholder="e.g. Rahul Sharma"
+                          value={fullName}
+                          onChange={(e) => {
+                            setFullName(e.target.value);
+                            if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: null }));
+                          }}
+                          autoComplete="name"
+                        />
+                      </div>
+                      {errors.fullName && <span className="auth-field-error">{errors.fullName}</span>}
+                    </div>
+
+                    {/* Mobile Number */}
+                    <div className="auth-field">
+                      <label htmlFor="mobileNumber" className="auth-label">
+                        Mobile Number
+                      </label>
+                      <div className="auth-input-wrap">
+                        <input
+                          id="mobileNumber"
+                          type="tel"
+                          className={`auth-input ${errors.mobileNumber ? 'auth-input--error' : ''}`}
+                          placeholder="e.g. +91 9876543210"
+                          value={mobileNumber}
+                          onChange={(e) => {
+                            setMobileNumber(e.target.value);
+                            if (errors.mobileNumber) setErrors((prev) => ({ ...prev, mobileNumber: null }));
+                          }}
+                          autoComplete="tel"
+                        />
+                      </div>
+                      {errors.mobileNumber && <span className="auth-field-error">{errors.mobileNumber}</span>}
+                    </div>
+
+                    {/* Email Address */}
+                    <div className="auth-field">
+                      <label htmlFor="email" className="auth-label">
+                        Email
+                      </label>
+                      <div className="auth-input-wrap">
+                        <input
+                          id="email"
+                          type="email"
+                          className={`auth-input ${errors.email ? 'auth-input--error' : ''}`}
+                          placeholder="e.g. rahul@example.com"
+                          value={email}
+                          onChange={(e) => {
+                            setEmail(e.target.value);
+                            if (errors.email) setErrors((prev) => ({ ...prev, email: null }));
+                          }}
+                          autoComplete="email"
+                        />
+                      </div>
+                      {errors.email && <span className="auth-field-error">{errors.email}</span>}
+                    </div>
+
+                    {/* Password */}
+                    <div className="auth-field">
+                      <label htmlFor="password" className="auth-label">
+                        Password
+                      </label>
+                      <div className="auth-input-wrap">
+                        <input
+                          id="password"
+                          type={showPassword ? 'text' : 'password'}
+                          className={`auth-input ${errors.password ? 'auth-input--error' : ''}`}
+                          placeholder="Min 6 characters"
+                          value={password}
+                          onChange={(e) => {
+                            setPassword(e.target.value);
+                            if (errors.password) setErrors((prev) => ({ ...prev, password: null }));
+                          }}
+                          autoComplete="new-password"
+                        />
+                        <button
+                          type="button"
+                          className="auth-eye-btn"
+                          onClick={() => setShowPassword((prev) => !prev)}
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                      {errors.password && <span className="auth-field-error">{errors.password}</span>}
+                    </div>
+
+                    {/* Confirm Password */}
+                    <div className="auth-field">
+                      <label htmlFor="confirmPassword" className="auth-label">
+                        Confirm Password
+                      </label>
+                      <div className="auth-input-wrap">
+                        <input
+                          id="confirmPassword"
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          className={`auth-input ${errors.confirmPassword ? 'auth-input--error' : ''}`}
+                          placeholder="Re-enter password"
+                          value={confirmPassword}
+                          onChange={(e) => {
+                            setConfirmPassword(e.target.value);
+                            if (errors.confirmPassword) setErrors((prev) => ({ ...prev, confirmPassword: null }));
+                          }}
+                          autoComplete="new-password"
+                        />
+                        <button
+                          type="button"
+                          className="auth-eye-btn"
+                          onClick={() => setShowConfirmPassword((prev) => !prev)}
+                          aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                      {errors.confirmPassword && <span className="auth-field-error">{errors.confirmPassword}</span>}
+                    </div>
+
+                    {/* Primary Submit */}
+                    <button
+                      type="submit"
+                      className="auth-btn-primary"
+                      style={{ marginTop: '0.4rem' }}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? 'Sending verification code...' : activeRole.buttonText}
+                    </button>
+                  </form>
+
+                  {/* Login Link */}
+                  <div className="auth-footer-text">
+                    <span>Already have an account?</span>{' '}
+                    <Link to="/login" className="auth-link-bold">
+                      Login
+                    </Link>
+                  </div>
+                </>
+              )}
             </>
           )}
 

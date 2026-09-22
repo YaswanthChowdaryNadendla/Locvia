@@ -144,7 +144,14 @@ public class EmailVerificationService {
         userRepository.save(user);
 
         log.info("Email verified successfully for user: {}", email);
-        return new MessageResponse("Email verified successfully");
+
+        String successMessage = switch (user.getRole()) {
+            case SHOP_OWNER -> "Email verified successfully. Your Shop Owner account has been created and is pending admin approval.";
+            case DELIVERY_PARTNER -> "Email verified successfully. Your Delivery Partner account has been created and is pending admin approval.";
+            default -> "Email verified successfully. Your Customer account has been created. You can now login.";
+        };
+
+        return new MessageResponse(successMessage);
     }
 
     /**

@@ -140,7 +140,7 @@ class EmailVerificationApiTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(verifyReq)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Email verified successfully"));
+                .andExpect(jsonPath("$.message").value("Email verified successfully. Your Customer account has been created. You can now login."));
 
         User user = userRepository.findByEmail("ev.test3@example.com").orElseThrow();
         assertThat(user.getEmailVerified()).isTrue();
@@ -522,5 +522,171 @@ class EmailVerificationApiTests {
         EmailVerificationOtp record = otpRepository.findByEmail("ev.test1@example.com").orElseThrow();
         assertThat(record.getOtpHash()).startsWith("$2");
         assertThat(record.getOtpHash()).hasSizeGreaterThan(50);
+    }
+
+    @Test
+    @DisplayName("21. Public alias POST /api/auth/verify-signup-email verifies email successfully")
+    void test21_verifySignupEmailAliasWorks() throws Exception {
+        RegisterRequest req = new RegisterRequest("EV User 21", "ev.test1@example.com", "9900000021", "Password@123", UserRole.CUSTOMER);
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated());
+
+        EmailVerificationOtp record = otpRepository.findByEmail("ev.test1@example.com").orElseThrow();
+        record.setOtpHash(passwordEncoder.encode("123456"));
+        otpRepository.save(record);
+
+        VerifyEmailRequest verifyReq = new VerifyEmailRequest("ev.test1@example.com", "123456");
+        mockMvc.perform(post("/api/auth/verify-signup-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(verifyReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Email verified successfully. Your Customer account has been created. You can now login."));
+
+        User user = userRepository.findByEmail("ev.test1@example.com").orElseThrow();
+        assertThat(user.getEmailVerified()).isTrue();
+    }
+
+    @Test
+    @DisplayName("22. Public alias POST /api/auth/resend-signup-otp enforces cooldown and sends OTP")
+    void test22_resendSignupOtpAliasWorks() throws Exception {
+        RegisterRequest req = new RegisterRequest("EV User 22", "ev.test2@example.com", "9900000022", "Password@123", UserRole.CUSTOMER);
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated());
+
+        // Cooldown is active immediately
+        ResendVerificationRequest resendReq = new ResendVerificationRequest("ev.test2@example.com");
+        mockMvc.perform(post("/api/auth/resend-signup-otp")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(resendReq)))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.message").value("Please wait before requesting another code."));
+    }
+
+    @Test
+    @DisplayName("23. SHOP_OWNER email verification returns specific pending approval message and keeps PENDING status")
+    void test23_shopOwnerVerificationSuccessMessage() throws Exception {
+        RegisterRequest req = new RegisterRequest("EV Shop 23", "ev.shop@example.com", "9900000023", "Password@123", UserRole.SHOP_OWNER);
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated());
+
+        EmailVerificationOtp record = otpRepository.findByEmail("ev.shop@example.com").orElseThrow();
+        record.setOtpHash(passwordEncoder.encode("654321"));
+        otpRepository.save(record);
+
+        VerifyEmailRequest verifyReq = new VerifyEmailRequest("ev.shop@example.com", "654321");
+        mockMvc.perform(post("/api/auth/verify-signup-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(verifyReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Email verified successfully. Your Shop Owner account has been created and is pending admin approval."));
+
+        User user = userRepository.findByEmail("ev.shop@example.com").orElseThrow();
+        assertThat(user.getEmailVerified()).isTrue();
+        assertThat(user.getAccountStatus()).isEqualTo(AccountStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("24. DELIVERY_PARTNER email verification returns specific pending approval message and keeps PENDING status")
+    void test24_deliveryPartnerVerificationSuccessMessage() throws Exception {
+        RegisterRequest req = new RegisterRequest("EV Deliv 24", "ev.deliv@example.com", "9900000024", "Password@123", UserRole.DELIVERY_PARTNER);
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated());
+
+        EmailVerificationOtp record = otpRepository.findByEmail("ev.deliv@example.com").orElseThrow();
+        record.setOtpHash(passwordEncoder.encode("789123"));
+        otpRepository.save(record);
+
+        VerifyEmailRequest verifyReq = new VerifyEmailRequest("ev.deliv@example.com", "789123");
+        mockMvc.perform(post("/api/auth/verify-signup-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(verifyReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Email verified successfully. Your Delivery Partner account has been created and is pending admin approval."));
+
+        User user = userRepository.findByEmail("ev.deliv@example.com").orElseThrow();
+        assertThat(user.getEmailVerified()).isTrue();
+        assertThat(user.getAccountStatus()).isEqualTo(AccountStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("25. Public registration with role=ADMIN is rejected with HTTP 403, creating no user or OTP")
+    void test25_adminRegistrationRejectedViaApi() throws Exception {
+        RegisterRequest req = new RegisterRequest("Malicious Admin", "ev.admin@example.com", "9900000025", "Password@123", UserRole.ADMIN);
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(containsString("Administrator accounts cannot be created")));
+
+        assertThat(userRepository.findByEmail("ev.admin@example.com")).isEmpty();
+        assertThat(otpRepository.findByEmail("ev.admin@example.com")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("26. Password-reset OTP cannot be used to verify signup email")
+    void test26_passwordResetOtpCannotVerifySignupEmail() throws Exception {
+        // Register customer (creates EmailVerificationOtp)
+        RegisterRequest req = new RegisterRequest("EV User 26", "ev.test4@example.com", "9900000026", "Password@123", UserRole.CUSTOMER);
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated());
+
+        // Password reset OTP with different digits exists in password_reset_otps
+        var fpRecord = new com.locvia.entity.PasswordResetOtp();
+        fpRecord.setEmail("ev.test4@example.com");
+        fpRecord.setOtpHash(passwordEncoder.encode("999111"));
+        fpRecord.setExpiresAt(LocalDateTime.now().plusMinutes(10));
+        passwordResetOtpRepository.save(fpRecord);
+
+        // Attempting to verify signup email with password reset OTP (999111) must fail
+        VerifyEmailRequest verifyReq = new VerifyEmailRequest("ev.test4@example.com", "999111");
+        mockMvc.perform(post("/api/auth/verify-signup-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(verifyReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Invalid verification code."));
+
+        User user = userRepository.findByEmail("ev.test4@example.com").orElseThrow();
+        assertThat(user.getEmailVerified()).isFalse();
+    }
+
+    @Test
+    @DisplayName("27. Signup email OTP cannot be used to verify password reset")
+    void test27_signupEmailOtpCannotResetPassword() throws Exception {
+        // User exists with emailVerified = true and requests password reset
+        User user = new User("EV User 27", "ev.fp@example.com", "9900000027", passwordEncoder.encode("OldPass@123"), UserRole.CUSTOMER);
+        user.setEmailVerified(true);
+        userRepository.save(user);
+
+        // Issue password reset OTP (which creates password_reset_otps record)
+        ForgotPasswordRequest fpReq = new ForgotPasswordRequest("ev.fp@example.com");
+        mockMvc.perform(post("/api/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(fpReq)))
+                .andExpect(status().isOk());
+
+        // Create a signup verification OTP record with a different OTP
+        EmailVerificationOtp evRecord = new EmailVerificationOtp();
+        evRecord.setEmail("ev.fp@example.com");
+        evRecord.setOtpHash(passwordEncoder.encode("555222"));
+        evRecord.setExpiresAt(LocalDateTime.now().plusMinutes(10));
+        otpRepository.save(evRecord);
+
+        // Attempting to verify password reset with signup OTP (555222) must fail
+        VerifyOtpRequest voReq = new VerifyOtpRequest("ev.fp@example.com", "555222");
+        mockMvc.perform(post("/api/auth/verify-reset-otp")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(voReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(containsString("Incorrect code")));
     }
 }

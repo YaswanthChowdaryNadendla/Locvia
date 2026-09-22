@@ -105,24 +105,30 @@ export const resetPassword = async ({ email, resetToken, newPassword }) => {
 
 /**
  * Verifies email using 6-digit OTP code received after registration.
+ * POST /api/auth/verify-signup-email (or /api/auth/verify-email)
  * @param {Object} payload
  * @param {string} payload.email
  * @param {string} payload.otp
  * @returns {Promise<{ message: string }>}
  */
-export const verifyEmail = async ({ email, otp }) => {
-  return axiosClient.post(ENDPOINTS.AUTH.VERIFY_EMAIL, { email, otp }, { timeout: AUTH_REQUEST_TIMEOUT });
+export const verifySignupEmail = async ({ email, otp }) => {
+  return axiosClient.post(ENDPOINTS.AUTH.VERIFY_SIGNUP_EMAIL, { email, otp }, { timeout: AUTH_REQUEST_TIMEOUT });
 };
 
 /**
  * Resends email verification 6-digit OTP code (backend enforces 60s cooldown).
+ * POST /api/auth/resend-signup-otp (or /api/auth/resend-verification)
  * @param {Object} payload
  * @param {string} payload.email
  * @returns {Promise<{ message: string }>}
  */
-export const resendVerification = async ({ email }) => {
-  return axiosClient.post(ENDPOINTS.AUTH.RESEND_VERIFICATION, { email }, { timeout: AUTH_REQUEST_TIMEOUT });
+export const resendSignupOtp = async ({ email }) => {
+  return axiosClient.post(ENDPOINTS.AUTH.RESEND_SIGNUP_OTP, { email }, { timeout: AUTH_REQUEST_TIMEOUT });
 };
+
+// Aliases for compatibility
+export const verifyEmail = verifySignupEmail;
+export const resendVerification = resendSignupOtp;
 
 export default {
   login,
@@ -135,5 +141,7 @@ export default {
   verifyResetOtp,
   resetPassword,
   verifyEmail,
+  verifySignupEmail,
   resendVerification,
+  resendSignupOtp,
 };

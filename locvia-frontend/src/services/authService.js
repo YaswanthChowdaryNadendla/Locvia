@@ -92,16 +92,25 @@ export const loginWithGoogle = async ({ credential, selectedRole }) => {
  */
 export const register = async (userData) => {
   const response = await authApi.register(userData);
+  
+  // If email verification is required, do NOT save token or log the user in
+  if (response?.emailVerificationRequired) {
+    return response;
+  }
+
   const { token, user } = response;
+  if (token && user) {
+    localStorage.setItem('locvia_token', token);
+    localStorage.setItem('locvia_user', JSON.stringify(user));
 
-  localStorage.setItem('locvia_token', token);
-  localStorage.setItem('locvia_user', JSON.stringify(user));
+    return {
+      token,
+      user,
+      redirectTo: getRoleHomePath(user.role),
+    };
+  }
 
-  return {
-    token,
-    user,
-    redirectTo: getRoleHomePath(user.role),
-  };
+  return response;
 };
 
 // ── Logout ─────────────────────────────────────────────────────────────────

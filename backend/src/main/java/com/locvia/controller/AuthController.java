@@ -61,11 +61,12 @@ public class AuthController {
     /**
      * Public email verification endpoint.
      * POST /api/auth/verify-email
+     * POST /api/auth/verify-signup-email
      *
      * @param request email and 6-digit OTP
      * @return MessageResponse confirming email verification
      */
-    @PostMapping("/verify-email")
+    @PostMapping({"/verify-email", "/verify-signup-email"})
     public ResponseEntity<MessageResponse> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
         MessageResponse response = emailVerificationService.verifyEmail(request);
         return ResponseEntity.ok(response);
@@ -75,11 +76,12 @@ public class AuthController {
      * Public endpoint to resend registration verification code.
      * Enforces 60-second cooldown on the backend.
      * POST /api/auth/resend-verification
+     * POST /api/auth/resend-signup-otp
      *
      * @param request recipient email
      * @return MessageResponse confirming dispatch
      */
-    @PostMapping("/resend-verification")
+    @PostMapping({"/resend-verification", "/resend-signup-otp"})
     public ResponseEntity<MessageResponse> resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
         MessageResponse response = emailVerificationService.resendVerification(request);
         return ResponseEntity.ok(response);

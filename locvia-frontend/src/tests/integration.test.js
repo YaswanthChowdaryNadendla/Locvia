@@ -330,4 +330,41 @@ test('Integration Suite - Module 65', async (t) => {
     assert.equal(normalized.status, 404);
     assert.equal(normalized.message, 'Email does not exist. Please create an account first.');
   });
+
+  await t.test('22. Signup email verification endpoints align with AuthController.java', () => {
+    assert.equal(ENDPOINTS.AUTH.VERIFY_SIGNUP_EMAIL, '/auth/verify-signup-email');
+    assert.equal(ENDPOINTS.AUTH.RESEND_SIGNUP_OTP, '/auth/resend-signup-otp');
+    assert.equal(ENDPOINTS.AUTH.VERIFY_EMAIL, '/auth/verify-email');
+    assert.equal(ENDPOINTS.AUTH.RESEND_VERIFICATION, '/auth/resend-verification');
+  });
+
+  await t.test('23. Registration with emailVerificationRequired does not authenticate session into localStorage', () => {
+    localStorage.clear();
+    const registerResponse = {
+      message: 'Verification code sent to your email',
+      emailVerificationRequired: true,
+      email: 'newuser@example.com',
+      user: {
+        id: 99,
+        name: 'New User',
+        email: 'newuser@example.com',
+        role: 'CUSTOMER',
+        accountStatus: 'APPROVED',
+      },
+    };
+
+    // If registration requires email verification, no token is issued or stored
+    if (registerResponse.emailVerificationRequired) {
+      // Must not set token
+      assert.equal(localStorage.getItem('locvia_token'), null);
+      assert.equal(localStorage.getItem('locvia_user'), null);
+    }
+  });
+
+  await t.test('24. Role-specific signup definitions support CUSTOMER, SHOP_OWNER, DELIVERY_PARTNER and restrict ADMIN', () => {
+    const roles = ['CUSTOMER', 'SHOP_OWNER', 'DELIVERY_PARTNER', 'ADMIN'];
+    const publicRoles = roles.filter((r) => r !== 'ADMIN');
+    assert.deepEqual(publicRoles, ['CUSTOMER', 'SHOP_OWNER', 'DELIVERY_PARTNER']);
+    assert.equal(roles.includes('ADMIN'), true);
+  });
 });

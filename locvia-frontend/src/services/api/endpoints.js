@@ -9,7 +9,9 @@ export const ENDPOINTS = {
     GOOGLE: '/auth/google',
     ME: '/auth/me',
     VERIFY_EMAIL: '/auth/verify-email',
+    VERIFY_SIGNUP_EMAIL: '/auth/verify-signup-email',
     RESEND_VERIFICATION: '/auth/resend-verification',
+    RESEND_SIGNUP_OTP: '/auth/resend-signup-otp',
     // Password reset flow (3-step, public)
     FORGOT_PASSWORD: '/auth/forgot-password',
     VERIFY_RESET_OTP: '/auth/verify-reset-otp',

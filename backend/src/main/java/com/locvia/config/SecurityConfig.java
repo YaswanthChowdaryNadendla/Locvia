@@ -74,7 +74,12 @@ public class SecurityConfig {
                         // Public endpoints
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/google").permitAll()
-                        .requestMatchers("/api/auth/verify-email", "/api/auth/resend-verification").permitAll()
+                        .requestMatchers(
+                                "/api/auth/verify-email",
+                                "/api/auth/verify-signup-email",
+                                "/api/auth/resend-verification",
+                                "/api/auth/resend-signup-otp"
+                        ).permitAll()
                         // Password-reset endpoints — public (unauthenticated users need these)
                         .requestMatchers("/api/auth/forgot-password", "/api/auth/verify-reset-otp", "/api/auth/reset-password").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/payments/razorpay/webhook").permitAll()

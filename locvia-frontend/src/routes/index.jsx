@@ -171,16 +171,8 @@ const AppRoutes = () => {
         {/* ── /shop/login → redirects to unified /login ─── */}
         <Route path="/shop/login" element={<Navigate to="/login" replace />} />
 
-        <Route
-          path="/shop/register"
-          element={
-            <ShopOwnerAuthProvider>
-              <PublicLayout hideFooter>
-                <ShopOwnerRegister />
-              </PublicLayout>
-            </ShopOwnerAuthProvider>
-          }
-        />
+        {/* ── /shop/register → redirects to unified /register?role=SHOP_OWNER ─── */}
+        <Route path="/shop/register" element={<Navigate to="/register?role=SHOP_OWNER" replace />} />
 
 
         <Route
