@@ -768,7 +768,7 @@ const RegisterPage = () => {
                       style={{ marginTop: '0.4rem' }}
                       disabled={isLoading}
                     >
-                      {isLoading ? 'Sending verification code...' : activeRole.buttonText}
+                      {isLoading ? 'Creating account...' : activeRole.buttonText}
                     </button>
                   </form>
 
