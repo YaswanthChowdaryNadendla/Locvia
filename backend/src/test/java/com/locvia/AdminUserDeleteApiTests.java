@@ -254,7 +254,7 @@ class AdminUserDeleteApiTests {
         mockMvc.perform(delete("/api/admin/users/" + adminUser.getId())
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.message").value("Administrators cannot delete their own account."));
+                .andExpect(jsonPath("$.message").value("Admin accounts cannot be deleted."));
 
         assertThat(userRepository.findById(adminUser.getId())).isPresent();
     }
@@ -265,9 +265,26 @@ class AdminUserDeleteApiTests {
         mockMvc.perform(delete("/api/admin/users/" + defaultAdminUser.getId())
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.message").value("Default administrator account cannot be deleted."));
+                .andExpect(jsonPath("$.message").value("Admin accounts cannot be deleted."));
 
         assertThat(userRepository.findById(defaultAdminUser.getId())).isPresent();
+    }
+
+    @Test
+    @DisplayName("10b. Admin cannot delete another ADMIN account (403 Forbidden)")
+    void adminCannotDeleteAnotherAdminAccount() throws Exception {
+        User anotherAdmin = new User("Second Admin", "second.admin@locvia.com", "9876543209",
+                passwordEncoder.encode("AdminPass456!"), UserRole.ADMIN);
+        anotherAdmin.setActive(true);
+        anotherAdmin.setAccountStatus(AccountStatus.APPROVED);
+        anotherAdmin = userRepository.save(anotherAdmin);
+
+        mockMvc.perform(delete("/api/admin/users/" + anotherAdmin.getId())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Admin accounts cannot be deleted."));
+
+        assertThat(userRepository.findById(anotherAdmin.getId())).isPresent();
     }
 
     @Test

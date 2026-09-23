@@ -111,7 +111,6 @@ export const ENDPOINTS = {
 
   // Platform Administration (Admin Controllers)
   ADMIN: {
-    DASHBOARD: '/admin/dashboard',
     METRICS: '/admin/metrics',
     USERS: '/admin/users',
     USER_BY_ID: (id) => `/admin/users/${id}`,

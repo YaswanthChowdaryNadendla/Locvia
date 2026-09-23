@@ -18,7 +18,7 @@ export const getRoleHomePath = (role) => {
     [ROLES.CUSTOMER]:          '/customer',
     [ROLES.SHOP_OWNER]:        '/shop-owner/dashboard',
     [ROLES.DELIVERY_PARTNER]:  '/delivery/dashboard',
-    [ROLES.ADMIN]:             '/admin/dashboard',
+    [ROLES.ADMIN]:             '/admin/users',
   };
   return paths[role] || '/';
 };

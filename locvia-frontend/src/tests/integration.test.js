@@ -28,9 +28,15 @@ globalThis.CustomEvent = class CustomEvent {
 };
 
 // Import services and modules to test
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { normalizeApiError } from '../services/api/errorHandler.js';
 import ENDPOINTS from '../services/api/endpoints.js';
-import { getRoleHomePath } from '../data/users.js';
+import { getRoleHomePath, ROLES } from '../data/users.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 test('Integration Suite - Module 65', async (t) => {
 
@@ -107,7 +113,7 @@ test('Integration Suite - Module 65', async (t) => {
     assert.equal(getRoleHomePath('CUSTOMER'), '/customer');
     assert.equal(getRoleHomePath('SHOP_OWNER'), '/shop-owner/dashboard');
     assert.equal(getRoleHomePath('DELIVERY_PARTNER'), '/delivery/dashboard');
-    assert.equal(getRoleHomePath('ADMIN'), '/admin/dashboard');
+    assert.equal(getRoleHomePath('ADMIN'), '/admin/users');
   });
 
   await t.test('7. Customer API endpoints match backend mapping', () => {
@@ -156,7 +162,7 @@ test('Integration Suite - Module 65', async (t) => {
   });
 
   await t.test('13. Admin API endpoints align with Admin controllers', () => {
-    assert.equal(ENDPOINTS.ADMIN.DASHBOARD, '/admin/dashboard');
+    assert.equal(ENDPOINTS.ADMIN.METRICS, '/admin/metrics');
     assert.equal(ENDPOINTS.ADMIN.USERS, '/admin/users');
     assert.equal(ENDPOINTS.ADMIN.SHOPS, '/admin/shops');
     assert.equal(ENDPOINTS.ADMIN.CATEGORIES, '/admin/categories');
@@ -494,14 +500,14 @@ test('Integration Suite - Module 65', async (t) => {
         data: {
           status: 403,
           error: 'Forbidden',
-          message: 'Default administrator account cannot be deleted.',
+          message: 'Admin accounts cannot be deleted.',
         },
       },
     };
 
     const normalized = normalizeApiError(backendError);
     assert.equal(normalized.status, 403);
-    assert.equal(normalized.message, 'Default administrator account cannot be deleted.');
+    assert.equal(normalized.message, 'Admin accounts cannot be deleted.');
 
     // User is NOT removed from list on failure
     assert.equal(usersList.length, 2);
@@ -516,5 +522,98 @@ test('Integration Suite - Module 65', async (t) => {
 
     isDeleteLoading = false;
     assert.equal(isButtonDisabled(isDeleteLoading), false);
+  });
+
+  // ── Admin Deletion Protection & Admin Dashboard Removal Verification ──
+
+  const shouldRenderDeleteButton = (user) => {
+    return user && user.role !== ROLES.ADMIN;
+  };
+
+  const handleOpenDeleteModalSimulation = (user, stateSetter) => {
+    if (!user || user.role === ROLES.ADMIN) return;
+    stateSetter(user);
+  };
+
+  await t.test('33. Customer row shows Delete', () => {
+    const customerUser = { id: 101, name: 'Alice Customer', role: ROLES.CUSTOMER };
+    assert.equal(shouldRenderDeleteButton(customerUser), true);
+  });
+
+  await t.test('34. Shop Owner row shows Delete', () => {
+    const shopOwnerUser = { id: 102, name: 'Bob Shop Owner', role: ROLES.SHOP_OWNER };
+    assert.equal(shouldRenderDeleteButton(shopOwnerUser), true);
+  });
+
+  await t.test('35. Delivery Partner row shows Delete', () => {
+    const deliveryPartnerUser = { id: 103, name: 'Charlie Delivery', role: ROLES.DELIVERY_PARTNER };
+    assert.equal(shouldRenderDeleteButton(deliveryPartnerUser), true);
+  });
+
+  await t.test('36. Admin row does NOT show Delete', () => {
+    const adminUser = { id: 1, name: 'Locvia Admin', role: ROLES.ADMIN };
+    assert.equal(shouldRenderDeleteButton(adminUser), false);
+  });
+
+  await t.test('37. Clicking Delete for normal user opens confirmation modal', () => {
+    let userToDelete = null;
+    const setUserToDelete = (u) => { userToDelete = u; };
+
+    const normalUser = { id: 101, name: 'Alice Customer', role: ROLES.CUSTOMER };
+    handleOpenDeleteModalSimulation(normalUser, setUserToDelete);
+
+    assert.deepEqual(userToDelete, normalUser);
+    const modalRenders = Boolean(userToDelete && userToDelete.role !== ROLES.ADMIN);
+    assert.equal(modalRenders, true);
+  });
+
+  await t.test('38. Admin cannot open Delete modal', () => {
+    let userToDelete = null;
+    const setUserToDelete = (u) => { userToDelete = u; };
+
+    const adminUser = { id: 1, name: 'Locvia Admin', role: ROLES.ADMIN };
+    handleOpenDeleteModalSimulation(adminUser, setUserToDelete);
+
+    assert.equal(userToDelete, null);
+    // Double defense: even if userToDelete was somehow set to adminUser
+    userToDelete = adminUser;
+    const modalRenders = Boolean(userToDelete && userToDelete.role !== ROLES.ADMIN);
+    assert.equal(modalRenders, false);
+  });
+
+  await t.test('39. Dashboard is not present in Admin sidebar', () => {
+    const adminLayoutPath = path.resolve(__dirname, '../layouts/AdminLayout.jsx');
+    const adminLayoutSrc = fs.readFileSync(adminLayoutPath, 'utf8');
+
+    assert.ok(!adminLayoutSrc.includes("label: 'Dashboard'"));
+    assert.ok(!adminLayoutSrc.includes("to: '/admin/dashboard'"));
+  });
+
+  await t.test('40. Reviews remains present in Admin sidebar', () => {
+    const adminLayoutPath = path.resolve(__dirname, '../layouts/AdminLayout.jsx');
+    const adminLayoutSrc = fs.readFileSync(adminLayoutPath, 'utf8');
+
+    assert.ok(adminLayoutSrc.includes("label: 'Reviews'"));
+    assert.ok(adminLayoutSrc.includes("to: '/admin/reviews'"));
+  });
+
+  await t.test('41. /admin/dashboard is no longer routed', () => {
+    const routesPath = path.resolve(__dirname, '../routes/index.jsx');
+    const routesSrc = fs.readFileSync(routesPath, 'utf8');
+
+    assert.ok(!routesSrc.includes('path="/admin/dashboard"'));
+    assert.ok(!routesSrc.includes("path='/admin/dashboard'"));
+  });
+
+  await t.test('42. Admin landing route does not point to /admin/dashboard', () => {
+    assert.equal(getRoleHomePath('ADMIN'), '/admin/users');
+
+    const routesPath = path.resolve(__dirname, '../routes/index.jsx');
+    const routesSrc = fs.readFileSync(routesPath, 'utf8');
+
+    // /admin redirects to /admin/users
+    assert.ok(routesSrc.includes('path="/admin"'));
+    assert.ok(routesSrc.includes('to="/admin/users"'));
+    assert.ok(!routesSrc.includes('to="/admin/dashboard"'));
   });
 });

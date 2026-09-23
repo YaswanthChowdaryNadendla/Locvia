@@ -21,7 +21,7 @@ const ShopOwnerProtectedRoute = ({ children }) => {
 
   // Authenticated but wrong role → send to their actual dashboard
   if (user?.role !== 'SHOP_OWNER') {
-    if (user?.role === 'ADMIN') return <Navigate to="/admin/dashboard" replace />;
+    if (user?.role === 'ADMIN') return <Navigate to="/admin/users" replace />;
     if (user?.role === 'DELIVERY_PARTNER') return <Navigate to="/delivery/dashboard" replace />;
     return <Navigate to="/customer" replace />;
   }

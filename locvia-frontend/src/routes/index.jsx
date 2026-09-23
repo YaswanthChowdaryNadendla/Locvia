@@ -113,7 +113,7 @@ const AppRoutes = () => {
             ) : user?.role === ROLES.DELIVERY_PARTNER ? (
               <Navigate to="/delivery/dashboard" replace />
             ) : user?.role === ROLES.ADMIN ? (
-              <Navigate to="/admin/dashboard" replace />
+              <Navigate to="/admin/users" replace />
             ) : (
               <PublicLayout>
                 <HomePage />
@@ -132,7 +132,7 @@ const AppRoutes = () => {
                   : user?.role === ROLES.DELIVERY_PARTNER
                   ? <Navigate to="/delivery/dashboard" replace />
                   : user?.role === ROLES.ADMIN
-                  ? <Navigate to="/admin/dashboard" replace />
+                  ? <Navigate to="/admin/users" replace />
                   : <Navigate to="/customer" replace />
               )
               : (
@@ -755,14 +755,8 @@ const AppRoutes = () => {
 
         {/* ── Admin Routes ────────────────────── */}
         <Route
-          path="/admin/dashboard"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <PlaceholderPage title="Admin Dashboard" description="M12 — Admin Dashboard module." />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
+          path="/admin"
+          element={<Navigate to="/admin/users" replace />}
         />
         <Route
           path="/admin/users"

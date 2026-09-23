@@ -445,7 +445,7 @@ const UserMenu = ({ user, onLogout }) => {
                   const paths = {
                     [ROLES.SHOP_OWNER]: '/shop/dashboard',
                     [ROLES.DELIVERY_PARTNER]: '/delivery/dashboard',
-                    [ROLES.ADMIN]: '/admin/dashboard',
+                    [ROLES.ADMIN]: '/admin/users',
                   };
                   navigate(paths[user.role] || '/');
                   setOpen(false);
@@ -563,7 +563,7 @@ const MobileMenuDrawer = ({ isOpen, onClose, isAuthenticated, user, isCustomer, 
                       : user?.role === ROLES.DELIVERY_PARTNER
                       ? '/delivery/dashboard'
                       : user?.role === ROLES.ADMIN
-                      ? '/admin/dashboard'
+                      ? '/admin/users'
                       : '/'
                   }
                   className="mobile-drawer-link"

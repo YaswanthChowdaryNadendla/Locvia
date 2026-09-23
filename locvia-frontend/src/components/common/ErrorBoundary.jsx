@@ -42,7 +42,7 @@ class ErrorBoundary extends Component {
         const user = JSON.parse(rawUser);
         if (user?.role === 'SHOP_OWNER') target = '/shop-owner/dashboard';
         else if (user?.role === 'DELIVERY_PARTNER') target = '/delivery/dashboard';
-        else if (user?.role === 'ADMIN') target = '/admin/dashboard';
+        else if (user?.role === 'ADMIN') target = '/admin/users';
         else if (user?.role === 'CUSTOMER') target = '/customer';
       }
     } catch {

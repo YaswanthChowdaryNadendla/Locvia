@@ -294,7 +294,7 @@ class UserApiTests {
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("Forbidden"))
-                .andExpect(jsonPath("$.message").value(containsString("cannot delete")));
+                .andExpect(jsonPath("$.message").value(containsString("cannot be deleted")));
 
         User admin = userRepository.findById(adminUser.getId()).orElseThrow();
         assertThat(admin.isActive()).isTrue();

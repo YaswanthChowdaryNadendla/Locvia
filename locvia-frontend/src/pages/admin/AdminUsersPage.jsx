@@ -203,8 +203,13 @@ const AdminUsersPage = () => {
   };
 
   // ── Delete Action ──
+  const handleOpenDeleteModal = (targetUser) => {
+    if (!targetUser || targetUser.role === ROLES.ADMIN) return;
+    setUserToDelete(targetUser);
+  };
+
   const handleConfirmDelete = async () => {
-    if (!userToDelete || isDeleteLoading) return;
+    if (!userToDelete || userToDelete.role === ROLES.ADMIN || isDeleteLoading) return;
     setIsDeleteLoading(true);
     try {
       await deleteAdminUser(userToDelete.id);
@@ -522,14 +527,16 @@ const AdminUsersPage = () => {
                           <button onClick={() => setSelectedUserForDetails(u)} style={actionBtnStyle('#FFFFFF', '#334155', '1px solid #CBD5E1')}>
                             <Eye size={13} /> Details
                           </button>
-                          <button
-                            onClick={() => setUserToDelete(u)}
-                            disabled={isDeleteLoading || isActionLoading}
-                            style={actionBtnStyle('#FEF2F2', '#DC2626', '1px solid #FECACA')}
-                            title="Delete this account"
-                          >
-                            <Trash2 size={13} /> Delete
-                          </button>
+                          {u.role !== ROLES.ADMIN && (
+                            <button
+                              onClick={() => handleOpenDeleteModal(u)}
+                              disabled={isDeleteLoading || isActionLoading}
+                              style={actionBtnStyle('#FEF2F2', '#DC2626', '1px solid #FECACA')}
+                              title="Delete this account"
+                            >
+                              <Trash2 size={13} /> Delete
+                            </button>
+                          )}
                           {needsApproval && !isSelf && (
                             <>
                               {isPending || u.accountStatus === 'REJECTED' ? (
@@ -600,14 +607,16 @@ const AdminUsersPage = () => {
                     <button onClick={() => setSelectedUserForDetails(u)} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#334155', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                       <Eye size={13} /> Details
                     </button>
-                    <button
-                      onClick={() => setUserToDelete(u)}
-                      disabled={isDeleteLoading || isActionLoading}
-                      style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #FECACA', background: '#FEF2F2', color: '#DC2626', fontSize: '12px', fontWeight: 600, cursor: isDeleteLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
-                      title="Delete this account"
-                    >
-                      <Trash2 size={13} /> Delete
-                    </button>
+                    {u.role !== ROLES.ADMIN && (
+                      <button
+                        onClick={() => handleOpenDeleteModal(u)}
+                        disabled={isDeleteLoading || isActionLoading}
+                        style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #FECACA', background: '#FEF2F2', color: '#DC2626', fontSize: '12px', fontWeight: 600, cursor: isDeleteLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                        title="Delete this account"
+                      >
+                        <Trash2 size={13} /> Delete
+                      </button>
+                    )}
                     {needsApproval && !isSelf && (
                       <>
                         {(isPending || u.accountStatus === 'REJECTED') && (
@@ -730,7 +739,7 @@ const AdminUsersPage = () => {
       )}
 
       {/* ── Delete Account Confirmation Modal ── */}
-      {userToDelete && (
+      {userToDelete && userToDelete.role !== ROLES.ADMIN && (
         <div style={modalOverlayStyle}>
           <div style={{ background: '#FFFFFF', borderRadius: '16px', maxWidth: '420px', width: '100%', padding: '28px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', textAlign: 'center' }}>
             <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#FEF2F2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px auto' }}>

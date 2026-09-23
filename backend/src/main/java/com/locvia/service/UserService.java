@@ -284,15 +284,15 @@ public class UserService {
         User targetUser = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
 
-        // 1. Protect default administrator account
-        if (AdminAccountInitializer.DEFAULT_ADMIN_EMAIL.equalsIgnoreCase(targetUser.getEmail())) {
-            throw new SecurityException("Default administrator account cannot be deleted.");
+        // 1. Protect all administrator accounts (including admin@locvia.com, self, and any other ADMIN)
+        if (targetUser.getRole() == UserRole.ADMIN || AdminAccountInitializer.DEFAULT_ADMIN_EMAIL.equalsIgnoreCase(targetUser.getEmail())) {
+            throw new SecurityException("Admin accounts cannot be deleted.");
         }
 
         // 2. Prevent admin self-deletion
         User admin = findUserByNormalizedEmail(adminEmail);
         if (targetUser.getId().equals(admin.getId())) {
-            throw new SecurityException("Administrators cannot delete their own account.");
+            throw new SecurityException("Admin accounts cannot be deleted.");
         }
 
         // 3. Clean up ephemeral verification & password reset OTP records
