@@ -24,6 +24,7 @@ import com.locvia.dto.RegisterResponse;
 import com.locvia.exception.BusinessException;
 import com.locvia.security.google.GoogleTokenPayload;
 import com.locvia.security.google.GoogleTokenVerifierService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 
 import java.util.Optional;
@@ -44,6 +45,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final EmailVerificationService emailVerificationService;
     private final GoogleTokenVerifierService googleTokenVerifierService;
+    private final boolean emailVerificationEnabled;
 
     public AuthService(
             UserRepository userRepository,
@@ -51,13 +53,15 @@ public class AuthService {
             JwtService jwtService,
             AuthenticationManager authenticationManager,
             EmailVerificationService emailVerificationService,
-            GoogleTokenVerifierService googleTokenVerifierService) {
+            GoogleTokenVerifierService googleTokenVerifierService,
+            @Value("${locvia.email-verification.enabled:false}") boolean emailVerificationEnabled) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
         this.emailVerificationService = emailVerificationService;
         this.googleTokenVerifierService = googleTokenVerifierService;
+        this.emailVerificationEnabled = emailVerificationEnabled;
     }
 
     /**
@@ -104,19 +108,40 @@ public class AuthService {
                 assignedRole
         );
         user.setAccountStatus(accountStatus);
-        user.setEmailVerified(false);
 
-        User savedUser = userRepository.save(user);
+        if (emailVerificationEnabled) {
+            user.setEmailVerified(false);
+            User savedUser = userRepository.save(user);
 
-        // Generate and dispatch verification OTP via Resend
-        emailVerificationService.generateAndSendOtp(savedUser.getEmail());
+            // Generate and dispatch verification OTP via Resend
+            emailVerificationService.generateAndSendOtp(savedUser.getEmail());
 
-        return new RegisterResponse(
-                "Verification code sent to your email",
-                true,
-                savedUser.getEmail(),
-                UserSummaryDto.fromEntity(savedUser)
-        );
+            return new RegisterResponse(
+                    "Verification code sent to your email",
+                    true,
+                    savedUser.getEmail(),
+                    UserSummaryDto.fromEntity(savedUser)
+            );
+        } else {
+            // When email verification is disabled:
+            // Do not call Resend, do not generate OTP.
+            // Set emailVerified = true consistently so user can log in immediately.
+            user.setEmailVerified(true);
+            User savedUser = userRepository.save(user);
+
+            String message = switch (assignedRole) {
+                case SHOP_OWNER -> "Account created successfully. Your shop owner application is pending administrator approval.";
+                case DELIVERY_PARTNER -> "Account created successfully. Your delivery partner application is pending administrator approval.";
+                default -> "Account created successfully. You can now log in to Locvia.";
+            };
+
+            return new RegisterResponse(
+                    message,
+                    false,
+                    savedUser.getEmail(),
+                    UserSummaryDto.fromEntity(savedUser)
+            );
+        }
     }
 
     /**
@@ -126,7 +151,8 @@ public class AuthService {
      * We extract the principal directly from the returned Authentication object
      * to avoid a redundant second WAN round-trip to Aiven MySQL.
      *
-     * Enforces that the user has verified their email address before issuing a token.
+     * Enforces that the user has verified their email address before issuing a token
+     * only when email verification is enabled.
      *
      * @param request login payload
      * @return AuthResponse with JWT and safe user details
@@ -143,8 +169,8 @@ public class AuthService {
         // Extract user data from the authenticated principal (already loaded by DaoAuthenticationProvider)
         CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
 
-        // Enforce email verification
-        if (!principal.isEmailVerified()) {
+        // Enforce email verification only when enabled
+        if (emailVerificationEnabled && !principal.isEmailVerified()) {
             throw new BusinessException("Please verify your email before logging in.", HttpStatus.FORBIDDEN);
         }
 

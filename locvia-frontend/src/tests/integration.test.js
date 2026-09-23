@@ -367,4 +367,34 @@ test('Integration Suite - Module 65', async (t) => {
     assert.deepEqual(publicRoles, ['CUSTOMER', 'SHOP_OWNER', 'DELIVERY_PARTNER']);
     assert.equal(roles.includes('ADMIN'), true);
   });
+
+  await t.test('25. Configurable email verification: registration with emailVerificationRequired=false returns role messages without localStorage token', () => {
+    localStorage.clear();
+    const responses = [
+      {
+        message: 'Account created successfully. You can now log in to Locvia.',
+        emailVerificationRequired: false,
+        email: 'cust@example.com',
+        user: { id: 10, name: 'Cust User', email: 'cust@example.com', role: 'CUSTOMER', accountStatus: 'APPROVED' },
+      },
+      {
+        message: 'Account created successfully. Your shop owner application is pending administrator approval.',
+        emailVerificationRequired: false,
+        email: 'shop@example.com',
+        user: { id: 11, name: 'Shop User', email: 'shop@example.com', role: 'SHOP_OWNER', accountStatus: 'PENDING' },
+      },
+      {
+        message: 'Account created successfully. Your delivery partner application is pending administrator approval.',
+        emailVerificationRequired: false,
+        email: 'deliv@example.com',
+        user: { id: 12, name: 'Deliv User', email: 'deliv@example.com', role: 'DELIVERY_PARTNER', accountStatus: 'PENDING' },
+      },
+    ];
+
+    for (const res of responses) {
+      assert.equal(res.emailVerificationRequired, false);
+      assert.ok(res.message.includes('Account created successfully'));
+      assert.equal(localStorage.getItem('locvia_token'), null);
+    }
+  });
 });

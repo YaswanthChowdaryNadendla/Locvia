@@ -57,7 +57,8 @@ const maskEmail = (str) => {
 const RegisterPage = () => {
   const [searchParams] = useSearchParams();
   const queryEmail = searchParams.get('email') || '';
-  const isQueryVerify = searchParams.get('step') === 'verify' && Boolean(queryEmail);
+  const isVerificationConfigEnabled = import.meta.env.VITE_EMAIL_VERIFICATION_ENABLED === 'true';
+  const isQueryVerify = isVerificationConfigEnabled && searchParams.get('step') === 'verify' && Boolean(queryEmail);
 
   // Read initial role from URL query param if valid, else default to CUSTOMER
   const roleParam = (searchParams.get('role') || '').toUpperCase();
@@ -65,9 +66,10 @@ const RegisterPage = () => {
   const [selectedRole, setSelectedRole] = useState(initialRole);
   const [registeredRole, setRegisteredRole] = useState(initialRole);
 
-  // Flow step: 'form' | 'verify'
+  // Flow step: 'form' | 'verify' | 'success'
   const [step, setStep] = useState(isQueryVerify ? 'verify' : 'form');
   const [registeredEmail, setRegisteredEmail] = useState(queryEmail);
+  const [registrationSuccessMessage, setRegistrationSuccessMessage] = useState('');
 
   // Form Fields
   const [fullName, setFullName] = useState('');
@@ -190,7 +192,24 @@ const RegisterPage = () => {
         setResendFeedback('');
         startCooldown();
       } else {
-        navigate(result?.redirectTo || '/', { replace: true });
+        const defaultRoleMsg = selectedRole === 'SHOP_OWNER'
+          ? 'Account created successfully! Your shop owner application is pending administrator approval.'
+          : selectedRole === 'DELIVERY_PARTNER'
+          ? 'Account created successfully! Your delivery partner application is pending administrator approval.'
+          : 'Account created successfully! You can now log in to Locvia.';
+        const successMsg = result?.message || defaultRoleMsg;
+
+        setRegistrationSuccessMessage(successMsg);
+        setRegisteredEmail(email.trim());
+        setRegisteredRole(selectedRole);
+        setStep('success');
+
+        setTimeout(() => {
+          navigate('/login', {
+            replace: true,
+            state: { message: successMsg, email: email.trim(), role: selectedRole },
+          });
+        }, 2200);
       }
     } catch (err) {
       setServerError(err.message || 'Failed to create account. Please try again.');
@@ -351,7 +370,50 @@ const RegisterPage = () => {
             </Link>
           </div>
 
-          {step === 'verify' ? (
+          {step === 'success' ? (
+            <div className="auth-success-box" style={{ textAlign: 'center', padding: '1rem 0' }}>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '50%',
+                  background: '#dcfce7',
+                  color: '#16a34a',
+                  marginBottom: '1rem',
+                }}
+              >
+                <CheckCircle2 size={36} />
+              </div>
+              <h2 className="auth-title" style={{ marginTop: '0.5rem', color: '#16a34a', fontSize: '1.5rem' }}>
+                Account Created Successfully!
+              </h2>
+              <p className="auth-subtitle" style={{ marginTop: '0.5rem', marginBottom: '1.5rem', color: '#4b5563' }}>
+                {registrationSuccessMessage}
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  className="auth-btn auth-btn--primary"
+                  style={{ width: '100%', maxWidth: '280px' }}
+                  onClick={() =>
+                    navigate('/login', {
+                      replace: true,
+                      state: { message: registrationSuccessMessage, email: registeredEmail, role: registeredRole },
+                    })
+                  }
+                >
+                  Go to Login
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#6b7280', fontSize: '0.875rem' }}>
+                  <Loader2 size={16} className="auth-spinner" />
+                  <span>Redirecting to login...</span>
+                </div>
+              </div>
+            </div>
+          ) : step === 'verify' ? (
             <div>
               {verifySuccess ? (
                 <div className="auth-success-box">

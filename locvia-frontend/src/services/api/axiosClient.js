@@ -27,6 +27,16 @@ export const isApiEnabled = () => {
   return import.meta.env.VITE_ENABLE_API === 'true';
 };
 
+/**
+ * Checks whether email OTP verification is enabled for public signup.
+ * Returns true if VITE_EMAIL_VERIFICATION_ENABLED is explicitly set to 'true'.
+ * Defaults to false for development environments without a verified sending domain.
+ * @returns {boolean}
+ */
+export const isEmailVerificationEnabled = () => {
+  return import.meta.env.VITE_EMAIL_VERIFICATION_ENABLED === 'true';
+};
+
 const axiosClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 45000,
