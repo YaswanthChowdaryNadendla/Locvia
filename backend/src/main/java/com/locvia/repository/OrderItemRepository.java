@@ -21,4 +21,14 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
      * Retrieves all items belonging to a specific order ordered by ID ascending.
      */
     List<OrderItem> findByOrderIdOrderByIdAsc(Long orderId);
+
+    /**
+     * Retrieves all order items referencing a specific product.
+     */
+    List<OrderItem> findByProductId(Long productId);
+
+    /**
+     * Deletes all items belonging to a specific order.
+     */
+    void deleteByOrderId(Long orderId);
 }

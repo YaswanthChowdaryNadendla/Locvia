@@ -44,4 +44,14 @@ public interface AddressRepository extends JpaRepository<Address, Long> {
      * Checks if the user already has a default address configured.
      */
     boolean existsByUserIdAndIsDefaultTrue(Long userId);
+
+    /**
+     * Retrieves all addresses owned by a user.
+     */
+    List<Address> findByUserId(Long userId);
+
+    /**
+     * Deletes all addresses owned by a user.
+     */
+    void deleteByUserId(Long userId);
 }

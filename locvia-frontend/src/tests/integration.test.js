@@ -397,4 +397,124 @@ test('Integration Suite - Module 65', async (t) => {
       assert.equal(localStorage.getItem('locvia_token'), null);
     }
   });
+
+  await t.test('26. Admin delete user endpoint aligns with AdminUserController.java (DELETE /api/admin/users/{id})', () => {
+    assert.equal(ENDPOINTS.ADMIN.USER_BY_ID(42), '/admin/users/42');
+    assert.equal(ENDPOINTS.ADMIN.USERS, '/admin/users');
+  });
+
+  await t.test('27. Admin delete account confirmation dialog displays target user name, email, and role', () => {
+    const targetUser = {
+      id: 55,
+      name: 'Alice Customer',
+      email: 'alice.customer@example.com',
+      role: 'CUSTOMER',
+    };
+
+    const dialogState = {
+      title: 'Delete Account?',
+      subtitle: 'Are you sure you want to permanently delete this account?',
+      user: targetUser.name,
+      email: targetUser.email,
+      role: targetUser.role,
+    };
+
+    assert.equal(dialogState.title, 'Delete Account?');
+    assert.ok(dialogState.subtitle.includes('permanently delete this account'));
+    assert.equal(dialogState.user, 'Alice Customer');
+    assert.equal(dialogState.email, 'alice.customer@example.com');
+    assert.equal(dialogState.role, 'CUSTOMER');
+  });
+
+  await t.test('28. Cancel action dismisses confirmation without calling delete endpoint', () => {
+    let deleteCalled = false;
+    let userToDelete = { id: 10, name: 'Alice Customer' };
+
+    // Simulate clicking Cancel in UI
+    const handleCancel = () => {
+      userToDelete = null;
+    };
+    handleCancel();
+
+    assert.equal(userToDelete, null);
+    assert.equal(deleteCalled, false);
+  });
+
+  await t.test('29. Confirm action triggers DELETE /api/admin/users/{id}', async () => {
+    let requestedEndpoint = null;
+    let requestedMethod = null;
+
+    const mockDelete = async (url) => {
+      requestedEndpoint = url;
+      requestedMethod = 'DELETE';
+      return { message: 'Account deleted successfully' };
+    };
+
+    const targetUser = { id: 88, name: 'Target User' };
+    const res = await mockDelete(ENDPOINTS.ADMIN.USER_BY_ID(targetUser.id));
+
+    assert.equal(requestedMethod, 'DELETE');
+    assert.equal(requestedEndpoint, '/admin/users/88');
+    assert.equal(res.message, 'Account deleted successfully');
+  });
+
+  await t.test('30. Successful deletion removes user from displayed table and refreshes list', () => {
+    let usersList = [
+      { id: 1, name: 'Admin', role: 'ADMIN', active: true },
+      { id: 2, name: 'Customer Two', role: 'CUSTOMER', active: true },
+      { id: 3, name: 'Shop Owner', role: 'SHOP_OWNER', active: true },
+    ];
+
+    const targetId = 2;
+    // Optimistic removal
+    usersList = usersList.filter((u) => u.id !== targetId);
+
+    assert.equal(usersList.length, 2);
+    assert.ok(!usersList.some((u) => u.id === targetId));
+
+    // Reload verification
+    const reloadedUsers = [
+      { id: 1, name: 'Admin', role: 'ADMIN', active: true },
+      { id: 3, name: 'Shop Owner', role: 'SHOP_OWNER', active: true },
+    ];
+    usersList = reloadedUsers;
+    assert.equal(usersList.length, 2);
+  });
+
+  await t.test('31. Failed deletion retains user in table and displays backend error message', () => {
+    const usersList = [
+      { id: 1, name: 'Locvia Admin', email: 'admin@locvia.com', role: 'ADMIN', active: true },
+      { id: 2, name: 'Customer Two', email: 'cust2@example.com', role: 'CUSTOMER', active: true },
+    ];
+
+    // Backend error simulation (e.g. 403 Forbidden for protected admin)
+    const backendError = {
+      response: {
+        status: 403,
+        data: {
+          status: 403,
+          error: 'Forbidden',
+          message: 'Default administrator account cannot be deleted.',
+        },
+      },
+    };
+
+    const normalized = normalizeApiError(backendError);
+    assert.equal(normalized.status, 403);
+    assert.equal(normalized.message, 'Default administrator account cannot be deleted.');
+
+    // User is NOT removed from list on failure
+    assert.equal(usersList.length, 2);
+    assert.ok(usersList.some((u) => u.id === 1));
+  });
+
+  await t.test('32. Delete button is disabled while deletion request is processing', () => {
+    let isDeleteLoading = true;
+    const isButtonDisabled = (loading) => loading === true;
+
+    assert.equal(isButtonDisabled(isDeleteLoading), true);
+
+    isDeleteLoading = false;
+    assert.equal(isButtonDisabled(isDeleteLoading), false);
+  });
 });

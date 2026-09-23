@@ -51,6 +51,16 @@ export const updateUserActiveStatus = async (userId, active) => {
 };
 
 /**
+ * Deletes a platform user account.
+ * DELETE /api/admin/users/{id}
+ * @param {string|number} userId
+ * @returns {Promise<Object>}
+ */
+export const deleteAdminUser = async (userId) => {
+  return adminApi.deleteUser(userId);
+};
+
+/**
  * Calculates user statistics from a user list.
  * @param {Array} users
  * @returns {Object} stats

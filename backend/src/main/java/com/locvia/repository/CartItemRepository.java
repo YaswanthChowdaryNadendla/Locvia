@@ -37,4 +37,14 @@ public interface CartItemRepository extends JpaRepository<CartItem, Long> {
      * Counts the total distinct item entries in a cart.
      */
     long countByCartId(Long cartId);
+
+    /**
+     * Finds all cart items referencing a specific product.
+     */
+    List<CartItem> findByProductId(Long productId);
+
+    /**
+     * Deletes all cart items referencing a specific product.
+     */
+    void deleteByProductId(Long productId);
 }

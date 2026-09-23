@@ -2,10 +2,9 @@
 // Specific dashboard wrapper for System Administrators
 
 import DashboardLayout from './DashboardLayout';
-import { ShieldAlert, Users, Store, Package, Layers, ShoppingBag, Navigation, MessageSquare } from 'lucide-react';
+import { Users, Store, Package, Layers, ShoppingBag, Navigation, MessageSquare } from 'lucide-react';
 
 const ADMIN_LINKS = [
-  { to: '/admin/dashboard', label: 'Dashboard', icon: ShieldAlert },
   { to: '/admin/users', label: 'Users', icon: Users },
   { to: '/admin/shops', label: 'Shops', icon: Store },
   { to: '/admin/products', label: 'Products', icon: Package },

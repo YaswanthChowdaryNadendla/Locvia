@@ -22,11 +22,13 @@ import {
   Clock,
   ThumbsUp,
   ThumbsDown,
+  Trash2,
 } from 'lucide-react';
 import {
   getAllUsers,
   approveUser,
   rejectUser,
+  deleteAdminUser,
   calculateUserStats,
   getUserInitials,
   formatJoinedDate,
@@ -74,6 +76,8 @@ const AdminUsersPage = () => {
   // Modals & Toast State
   const [selectedUserForDetails, setSelectedUserForDetails] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); // { type: 'approve'|'reject', user }
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [isDeleteLoading, setIsDeleteLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
   const [toastType, setToastType] = useState('success'); // 'success' | 'error'
 
@@ -195,6 +199,24 @@ const AdminUsersPage = () => {
     } finally {
       setIsActionLoading(false);
       setConfirmAction(null);
+    }
+  };
+
+  // ── Delete Action ──
+  const handleConfirmDelete = async () => {
+    if (!userToDelete || isDeleteLoading) return;
+    setIsDeleteLoading(true);
+    try {
+      await deleteAdminUser(userToDelete.id);
+      setUsersList((prev) => prev.filter((u) => u.id !== userToDelete.id));
+      showToast('Account deleted successfully.', 'success');
+      setUserToDelete(null);
+      await loadUsers();
+    } catch (err) {
+      showToast(err?.message || 'Failed to delete account. Please try again.', 'error');
+      setUserToDelete(null);
+    } finally {
+      setIsDeleteLoading(false);
     }
   };
 
@@ -500,6 +522,14 @@ const AdminUsersPage = () => {
                           <button onClick={() => setSelectedUserForDetails(u)} style={actionBtnStyle('#FFFFFF', '#334155', '1px solid #CBD5E1')}>
                             <Eye size={13} /> Details
                           </button>
+                          <button
+                            onClick={() => setUserToDelete(u)}
+                            disabled={isDeleteLoading || isActionLoading}
+                            style={actionBtnStyle('#FEF2F2', '#DC2626', '1px solid #FECACA')}
+                            title="Delete this account"
+                          >
+                            <Trash2 size={13} /> Delete
+                          </button>
                           {needsApproval && !isSelf && (
                             <>
                               {isPending || u.accountStatus === 'REJECTED' ? (
@@ -569,6 +599,14 @@ const AdminUsersPage = () => {
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <button onClick={() => setSelectedUserForDetails(u)} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#334155', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                       <Eye size={13} /> Details
+                    </button>
+                    <button
+                      onClick={() => setUserToDelete(u)}
+                      disabled={isDeleteLoading || isActionLoading}
+                      style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #FECACA', background: '#FEF2F2', color: '#DC2626', fontSize: '12px', fontWeight: 600, cursor: isDeleteLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                      title="Delete this account"
+                    >
+                      <Trash2 size={13} /> Delete
                     </button>
                     {needsApproval && !isSelf && (
                       <>
@@ -684,6 +722,57 @@ const AdminUsersPage = () => {
                   <ButtonLoader size={16} color="#FFFFFF" text={confirmAction.type === 'approve' ? 'Approving...' : 'Rejecting...'} />
                 ) : (
                   confirmAction.type === 'approve' ? 'Yes, Approve' : 'Yes, Reject'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Account Confirmation Modal ── */}
+      {userToDelete && (
+        <div style={modalOverlayStyle}>
+          <div style={{ background: '#FFFFFF', borderRadius: '16px', maxWidth: '420px', width: '100%', padding: '28px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#FEF2F2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px auto' }}>
+              <Trash2 size={28} />
+            </div>
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', fontWeight: 700, color: '#0F172A' }}>
+              Delete Account?
+            </h3>
+            <p style={{ fontSize: '14px', color: '#64748B', margin: '0 0 16px 0', lineHeight: 1.6 }}>
+              Are you sure you want to permanently delete this account?
+            </p>
+            <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '12px', marginBottom: '20px', textAlign: 'left', fontSize: '13px' }}>
+              <div style={{ marginBottom: '6px', color: '#334155' }}>
+                <span style={{ color: '#64748B', fontWeight: 500 }}>User: </span>
+                <strong>{userToDelete.name}</strong>
+              </div>
+              <div style={{ marginBottom: '6px', color: '#334155', wordBreak: 'break-all' }}>
+                <span style={{ color: '#64748B', fontWeight: 500 }}>Email: </span>
+                <strong>{userToDelete.email}</strong>
+              </div>
+              <div style={{ color: '#334155' }}>
+                <span style={{ color: '#64748B', fontWeight: 500 }}>Role: </span>
+                <strong>{ROLE_LABELS[userToDelete.role] || userToDelete.role}</strong>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={() => setUserToDelete(null)}
+                disabled={isDeleteLoading}
+                style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#334155', fontSize: '14px', fontWeight: 600, cursor: isDeleteLoading ? 'not-allowed' : 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={isDeleteLoading}
+                style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: isDeleteLoading ? '#94A3B8' : '#DC2626', color: '#FFFFFF', fontSize: '14px', fontWeight: 600, cursor: isDeleteLoading ? 'not-allowed' : 'pointer' }}
+              >
+                {isDeleteLoading ? (
+                  <ButtonLoader size={16} color="#FFFFFF" text="Deleting..." />
+                ) : (
+                  'Delete Account'
                 )}
               </button>
             </div>

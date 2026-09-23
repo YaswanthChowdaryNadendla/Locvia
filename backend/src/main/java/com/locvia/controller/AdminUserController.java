@@ -78,7 +78,7 @@ public class AdminUserController {
     }
 
     /**
-     * Safely deactivates a user account without hard deleting historical business data.
+     * Physically deletes a user account from the platform.
      * DELETE /api/admin/users/{id}
      *
      * @param id        target user ID
@@ -86,11 +86,11 @@ public class AdminUserController {
      * @return confirmation message
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, String>> deactivateUser(
+    public ResponseEntity<Map<String, String>> deleteUser(
             @PathVariable Long id,
             Principal principal) {
-        userService.deactivateUserForAdmin(id, principal.getName());
-        return ResponseEntity.ok(Map.of("message", "User account deactivated successfully"));
+        userService.deleteUserForAdmin(id, principal.getName());
+        return ResponseEntity.ok(Map.of("message", "Account deleted successfully"));
     }
 
     /**

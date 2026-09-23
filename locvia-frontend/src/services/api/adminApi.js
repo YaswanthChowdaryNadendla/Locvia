@@ -176,11 +176,25 @@ export const getSystemMetrics = async () => {
   return axiosClient.get(ENDPOINTS.ADMIN.METRICS);
 };
 
+/**
+ * Deletes a platform user account.
+ * DELETE /api/admin/users/{id}
+ * @param {string|number} userId
+ * @returns {Promise<Object>}
+ */
+export const deleteUser = async (userId) => {
+  return axiosClient.delete(ENDPOINTS.ADMIN.USER_BY_ID(userId));
+};
+
+export const deleteAdminUser = deleteUser;
+
 export default {
   getUsers,
   updateUserStatus,
   approveUser,
   rejectUser,
+  deleteUser,
+  deleteAdminUser,
   getShops,
   updateShopStatus,
   getCategories,

@@ -275,27 +275,26 @@ class UserApiTests {
     }
 
     @Test
-    @DisplayName("15. DELETE /api/admin/users/{id} safely deactivates user (active = false)")
-    void deleteUserSafelyDeactivates() throws Exception {
+    @DisplayName("15. DELETE /api/admin/users/{id} physically deletes user from database")
+    void deleteUserPhysicallyDeletes() throws Exception {
         mockMvc.perform(delete("/api/admin/users/" + customer2.getId())
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value(containsString("deactivated")));
+                .andExpect(jsonPath("$.message").value(containsString("deleted")));
 
-        // Verify user was NOT hard deleted, but marked active = false
+        // Verify user was hard deleted from database
         Optional<User> userOpt = userRepository.findById(customer2.getId());
-        assertThat(userOpt).isPresent();
-        assertThat(userOpt.get().isActive()).isFalse();
+        assertThat(userOpt).isEmpty();
     }
 
     @Test
-    @DisplayName("16. ADMIN cannot deactivate or delete their own account (self-protection)")
-    void adminCannotDeactivateThemselves() throws Exception {
+    @DisplayName("16. ADMIN cannot delete their own account (self-protection)")
+    void adminCannotDeleteThemselves() throws Exception {
         mockMvc.perform(delete("/api/admin/users/" + adminUser.getId())
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("Forbidden"))
-                .andExpect(jsonPath("$.message").value(containsString("cannot deactivate")));
+                .andExpect(jsonPath("$.message").value(containsString("cannot delete")));
 
         User admin = userRepository.findById(adminUser.getId()).orElseThrow();
         assertThat(admin.isActive()).isTrue();

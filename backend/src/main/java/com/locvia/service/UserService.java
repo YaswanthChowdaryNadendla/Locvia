@@ -7,9 +7,11 @@ import com.locvia.dto.UserResponse;
 import com.locvia.entity.AccountStatus;
 import com.locvia.entity.User;
 import com.locvia.entity.UserRole;
+import com.locvia.config.AdminAccountInitializer;
+import com.locvia.entity.*;
 import com.locvia.exception.EmailAlreadyExistsException;
 import com.locvia.exception.ResourceNotFoundException;
-import com.locvia.repository.UserRepository;
+import com.locvia.repository.*;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -26,10 +28,54 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AddressRepository addressRepository;
+    private final CartRepository cartRepository;
+    private final CartItemRepository cartItemRepository;
+    private final NotificationRepository notificationRepository;
+    private final ReviewRepository reviewRepository;
+    private final DeliveryRepository deliveryRepository;
+    private final ShopRepository shopRepository;
+    private final ProductRepository productRepository;
+    private final InventoryRepository inventoryRepository;
+    private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final PaymentRepository paymentRepository;
+    private final EmailVerificationOtpRepository emailVerificationOtpRepository;
+    private final PasswordResetOtpRepository passwordResetOtpRepository;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            AddressRepository addressRepository,
+            CartRepository cartRepository,
+            CartItemRepository cartItemRepository,
+            NotificationRepository notificationRepository,
+            ReviewRepository reviewRepository,
+            DeliveryRepository deliveryRepository,
+            ShopRepository shopRepository,
+            ProductRepository productRepository,
+            InventoryRepository inventoryRepository,
+            OrderRepository orderRepository,
+            OrderItemRepository orderItemRepository,
+            PaymentRepository paymentRepository,
+            EmailVerificationOtpRepository emailVerificationOtpRepository,
+            PasswordResetOtpRepository passwordResetOtpRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.addressRepository = addressRepository;
+        this.cartRepository = cartRepository;
+        this.cartItemRepository = cartItemRepository;
+        this.notificationRepository = notificationRepository;
+        this.reviewRepository = reviewRepository;
+        this.deliveryRepository = deliveryRepository;
+        this.shopRepository = shopRepository;
+        this.productRepository = productRepository;
+        this.inventoryRepository = inventoryRepository;
+        this.orderRepository = orderRepository;
+        this.orderItemRepository = orderItemRepository;
+        this.paymentRepository = paymentRepository;
+        this.emailVerificationOtpRepository = emailVerificationOtpRepository;
+        this.passwordResetOtpRepository = passwordResetOtpRepository;
     }
 
     /**
@@ -222,6 +268,141 @@ public class UserService {
 
         targetUser.setActive(false);
         userRepository.save(targetUser);
+    }
+
+    /**
+     * Physically deletes a user account from the database for an administrator.
+     * Enforces default admin protection (admin@locvia.com cannot be deleted)
+     * and admin self-protection (cannot delete own account).
+     * Cleans up all related records in strict JPA dependency order.
+     *
+     * @param id         target user ID to delete
+     * @param adminEmail authenticated administrator's email
+     */
+    @Transactional
+    public void deleteUserForAdmin(Long id, String adminEmail) {
+        User targetUser = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+
+        // 1. Protect default administrator account
+        if (AdminAccountInitializer.DEFAULT_ADMIN_EMAIL.equalsIgnoreCase(targetUser.getEmail())) {
+            throw new SecurityException("Default administrator account cannot be deleted.");
+        }
+
+        // 2. Prevent admin self-deletion
+        User admin = findUserByNormalizedEmail(adminEmail);
+        if (targetUser.getId().equals(admin.getId())) {
+            throw new SecurityException("Administrators cannot delete their own account.");
+        }
+
+        // 3. Clean up ephemeral verification & password reset OTP records
+        String email = targetUser.getEmail().toLowerCase();
+        emailVerificationOtpRepository.deleteByEmail(email);
+        passwordResetOtpRepository.deleteByEmail(email);
+
+        // 4. Clean up notifications sent to this user
+        notificationRepository.deleteByRecipientUserId(targetUser.getId());
+
+        // 5. Clean up reviews authored by this user
+        reviewRepository.deleteByUserId(targetUser.getId());
+
+        // 6. Clean up customer Cart and CartItems
+        cartRepository.findByUserId(targetUser.getId()).ifPresent(cart -> {
+            cartItemRepository.deleteByCartId(cart.getId());
+            cartRepository.delete(cart);
+        });
+
+        // 7. If target user was a Delivery Partner, unassign from deliveries to preserve order delivery logs
+        List<Delivery> partnerDeliveries = deliveryRepository.findByDeliveryPartnerId(targetUser.getId());
+        for (Delivery delivery : partnerDeliveries) {
+            delivery.setDeliveryPartner(null);
+            deliveryRepository.save(delivery);
+        }
+
+        // 8. If target user owned shops, clean up shop catalog safely
+        List<Shop> ownedShops = shopRepository.findByOwnerId(targetUser.getId());
+        for (Shop shop : ownedShops) {
+            // Nullify shop reference in notifications
+            List<Notification> shopNotifs = notificationRepository.findByShopId(shop.getId());
+            for (Notification n : shopNotifs) {
+                n.setShop(null);
+                notificationRepository.save(n);
+            }
+
+            // Nullify shop reference in reviews
+            List<Review> shopReviews = reviewRepository.findByShopId(shop.getId());
+            for (Review r : shopReviews) {
+                r.setShop(null);
+                reviewRepository.save(r);
+            }
+
+            // Clean up products in this shop
+            List<Product> products = productRepository.findByShopId(shop.getId());
+            for (Product product : products) {
+                // Nullify product reference in OrderItems to preserve historical purchase snapshots
+                List<OrderItem> orderItems = orderItemRepository.findByProductId(product.getId());
+                for (OrderItem item : orderItems) {
+                    item.setProduct(null);
+                    orderItemRepository.save(item);
+                }
+
+                // Delete any cart items referencing this product
+                cartItemRepository.deleteByProductId(product.getId());
+
+                // Nullify review references for this product
+                List<Review> prodReviews = reviewRepository.findByProductId(product.getId());
+                for (Review r : prodReviews) {
+                    r.setProduct(null);
+                    reviewRepository.save(r);
+                }
+
+                // Delete product inventory
+                inventoryRepository.deleteByProductId(product.getId());
+
+                // Delete product
+                productRepository.delete(product);
+            }
+
+            // Delete the shop
+            shopRepository.delete(shop);
+        }
+
+        // 9. If target user placed orders, delete them along with child items, payments, and deliveries
+        List<Order> customerOrders = orderRepository.findByUserIdOrderByCreatedAtDesc(targetUser.getId());
+        for (Order order : customerOrders) {
+            // Delete notifications linked to this order
+            List<Notification> orderNotifs = notificationRepository.findByOrderId(order.getId());
+            notificationRepository.deleteAll(orderNotifs);
+
+            // Delete reviews linked to this order
+            List<Review> orderReviews = reviewRepository.findByOrderId(order.getId());
+            reviewRepository.deleteAll(orderReviews);
+
+            // Delete delivery linked to this order
+            deliveryRepository.findByOrderId(order.getId()).ifPresent(del -> {
+                List<Notification> delNotifs = notificationRepository.findByDeliveryId(del.getId());
+                notificationRepository.deleteAll(delNotifs);
+                deliveryRepository.delete(del);
+            });
+
+            // Delete payment record linked to this order
+            paymentRepository.findByOrderId(order.getId()).ifPresent(paymentRepository::delete);
+
+            // Delete order items
+            orderItemRepository.deleteByOrderId(order.getId());
+
+            // Nullify address reference on order to avoid constraint issues
+            order.setAddress(null);
+
+            // Delete order
+            orderRepository.delete(order);
+        }
+
+        // 10. Clean up customer's saved addresses
+        addressRepository.deleteByUserId(targetUser.getId());
+
+        // 11. Finally, physically delete the user account from the database
+        userRepository.delete(targetUser);
     }
 
     /**

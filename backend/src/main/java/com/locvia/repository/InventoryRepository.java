@@ -34,6 +34,13 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     boolean existsByProductId(Long productId);
 
     /**
+     * Deletes the inventory record for a specific product ID.
+     *
+     * @param productId product ID
+     */
+    void deleteByProductId(Long productId);
+
+    /**
      * Finds all inventory records belonging to products in a specific shop.
      *
      * @param shopId shop ID
