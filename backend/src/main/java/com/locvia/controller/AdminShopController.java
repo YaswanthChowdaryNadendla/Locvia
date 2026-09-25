@@ -74,15 +74,28 @@ public class AdminShopController {
     }
 
     /**
-     * Safely deactivates a shop account without deleting relational business records.
+     * Approves a registered shop.
+     * PATCH /api/admin/shops/{id}/approve
+     *
+     * @param id target shop ID
+     * @return updated ShopResponse
+     */
+    @RequestMapping(value = "/{id}/approve", method = {RequestMethod.PATCH, RequestMethod.PUT})
+    public ResponseEntity<ShopResponse> approveShop(@PathVariable Long id) {
+        ShopResponse response = shopService.approveShopForAdmin(id);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Permanently removes a shop and its associated storefront records.
      * DELETE /api/admin/shops/{id}
      *
      * @param id target shop ID
      * @return success confirmation
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, String>> deactivateShop(@PathVariable Long id) {
-        shopService.deactivateShopForAdmin(id);
-        return ResponseEntity.ok(Map.of("message", "Shop deactivated successfully"));
+    public ResponseEntity<Map<String, String>> deleteShop(@PathVariable Long id) {
+        shopService.deleteShopForAdmin(id);
+        return ResponseEntity.ok(Map.of("message", "Shop removed successfully"));
     }
 }

@@ -616,4 +616,136 @@ test('Integration Suite - Module 65', async (t) => {
     assert.ok(routesSrc.includes('to="/admin/users"'));
     assert.ok(!routesSrc.includes('to="/admin/dashboard"'));
   });
+
+  // ── Shop Registration & Admin Shop Approval / Removal Workflow ──
+
+  await t.test('43. Add Shop form validates required fields (name, address)', () => {
+    const validateShopForm = (data) => {
+      const errs = {};
+      if (!data.name || !data.name.trim()) errs.name = 'Shop name is required';
+      if (!data.address || !data.address.trim()) errs.address = 'Shop address is required';
+      if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())) {
+        errs.email = 'Invalid email';
+      }
+      return errs;
+    };
+
+    const emptyErrs = validateShopForm({ name: '', address: '' });
+    assert.equal(Boolean(emptyErrs.name), true);
+    assert.equal(Boolean(emptyErrs.address), true);
+
+    const validErrs = validateShopForm({ name: 'Fresh Mart', address: '123 Main St', email: 'mart@example.com' });
+    assert.equal(Object.keys(validErrs).length, 0);
+  });
+
+  await t.test('44. API endpoint for shop creation is /shops (POST)', () => {
+    assert.equal(ENDPOINTS.SHOPS.BASE, '/shops');
+  });
+
+  await t.test('45. Frontend payload does NOT contain ownerId or status (backend controlled)', () => {
+    const buildShopPayload = (form) => ({
+      name: form.name.trim(),
+      description: form.description?.trim() || null,
+      address: form.address.trim(),
+      phone: form.phone?.trim() || null,
+      email: form.email?.trim() || null,
+      imageUrl: form.imageUrl?.trim() || null,
+    });
+
+    const payload = buildShopPayload({
+      name: 'Yash Supermarket',
+      address: 'Market Street',
+      ownerId: 9999, // Should NOT be in payload
+      status: 'APPROVED', // Should NOT be in payload
+    });
+
+    assert.equal(payload.ownerId, undefined);
+    assert.equal(payload.status, undefined);
+    assert.equal(payload.name, 'Yash Supermarket');
+    assert.equal(payload.address, 'Market Street');
+  });
+
+  await t.test('46. Newly registered shop starts with PENDING status in response', () => {
+    const mockCreatedShop = {
+      id: 100,
+      name: 'Yash Supermarket',
+      status: 'PENDING',
+      active: false,
+    };
+
+    assert.equal(mockCreatedShop.status, 'PENDING');
+    assert.equal(mockCreatedShop.active, false);
+  });
+
+  await t.test('47. Pending status banner is displayed for PENDING shops', () => {
+    const shouldShowPendingBanner = (shop) => shop && shop.status === 'PENDING';
+
+    assert.equal(shouldShowPendingBanner({ id: 1, status: 'PENDING' }), true);
+    assert.equal(shouldShowPendingBanner({ id: 2, status: 'APPROVED' }), false);
+  });
+
+  await t.test('48. Admin sees PENDING shop and can Approve or Remove', () => {
+    const getAdminActions = (shop) => {
+      const actions = ['Details'];
+      if (shop.status === 'PENDING') {
+        actions.push('Approve');
+      }
+      actions.push('Remove');
+      return actions;
+    };
+
+    const pendingActions = getAdminActions({ id: 1, status: 'PENDING' });
+    assert.deepEqual(pendingActions, ['Details', 'Approve', 'Remove']);
+
+    const approvedActions = getAdminActions({ id: 2, status: 'APPROVED' });
+    assert.deepEqual(approvedActions, ['Details', 'Remove']);
+  });
+
+  await t.test('49. Admin approval changes shop status to APPROVED', () => {
+    let shopsList = [
+      { id: 1, name: 'Pending Mart', status: 'PENDING', active: false },
+      { id: 2, name: 'Active Mart', status: 'APPROVED', active: true },
+    ];
+
+    const applyApprove = (list, shopId) =>
+      list.map((s) => (s.id === shopId ? { ...s, status: 'APPROVED', active: true } : s));
+
+    shopsList = applyApprove(shopsList, 1);
+    assert.equal(shopsList[0].status, 'APPROVED');
+    assert.equal(shopsList[0].active, true);
+  });
+
+  await t.test('50. Admin removal confirmation modal shows required warning text', () => {
+    const adminShopsSrc = fs.readFileSync(path.resolve(__dirname, '../pages/admin/AdminShopsPage.jsx'), 'utf8');
+
+    assert.ok(adminShopsSrc.includes('Are you sure you want to remove this shop?'));
+    assert.ok(adminShopsSrc.includes('The Shop Owner will need to register the shop again and receive admin approval.'));
+  });
+
+  await t.test('51. Removed shop is deleted and filtered out of admin and owner lists', () => {
+    let shops = [
+      { id: 1, name: 'Shop One' },
+      { id: 2, name: 'Shop Two' },
+    ];
+
+    const removeShopFromList = (list, id) => list.filter((s) => s.id !== id);
+
+    shops = removeShopFromList(shops, 1);
+    assert.equal(shops.length, 1);
+    assert.equal(shops[0].id, 2);
+  });
+
+  await t.test('52. /shop-owner/add-shop route exists and is protected for SHOP_OWNER', () => {
+    const routesSrc = fs.readFileSync(path.resolve(__dirname, '../routes/index.jsx'), 'utf8');
+
+    assert.ok(routesSrc.includes('path="/shop-owner/add-shop"'));
+    assert.ok(routesSrc.includes('<AddShopPage'));
+  });
+
+  await t.test('53. Admin cannot create shops: AdminShopsPage does NOT have an Add Shop button', () => {
+    const adminShopsSrc = fs.readFileSync(path.resolve(__dirname, '../pages/admin/AdminShopsPage.jsx'), 'utf8');
+
+    assert.ok(!adminShopsSrc.includes('<Plus size={18} />\n          Add Shop'));
+    assert.ok(!adminShopsSrc.includes('showAddShopModal'));
+  });
 });

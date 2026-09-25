@@ -3,8 +3,10 @@ package com.locvia;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.locvia.dto.AdminUpdateShopRequest;
 import com.locvia.dto.CreateShopRequest;
+import com.locvia.dto.ShopResponse;
 import com.locvia.dto.UpdateShopRequest;
 import com.locvia.entity.Shop;
+import com.locvia.entity.ShopStatus;
 import com.locvia.entity.User;
 import com.locvia.entity.UserRole;
 import com.locvia.repository.ShopRepository;
@@ -99,6 +101,7 @@ class ShopApiTests {
         activeShop1.setLatitude(15.5057);
         activeShop1.setLongitude(80.0499);
         activeShop1.setActive(true);
+        activeShop1.setStatus(ShopStatus.APPROVED);
         activeShop1.setRating(4.5);
         activeShop1 = shopRepository.save(activeShop1);
 
@@ -106,6 +109,7 @@ class ShopApiTests {
         activeShop2.setLatitude(15.5100);
         activeShop2.setLongitude(80.0550);
         activeShop2.setActive(true);
+        activeShop2.setStatus(ShopStatus.APPROVED);
         activeShop2.setRating(4.2);
         activeShop2 = shopRepository.save(activeShop2);
 
@@ -113,11 +117,13 @@ class ShopApiTests {
         activeShop3.setLatitude(15.5200);
         activeShop3.setLongitude(80.0600);
         activeShop3.setActive(true);
+        activeShop3.setStatus(ShopStatus.APPROVED);
         activeShop3.setRating(4.8);
         activeShop3 = shopRepository.save(activeShop3);
 
         inactiveShop = new Shop("Old Corner Store", "Closed permanently", "40 Closed Road", "9876500002", "old@example.com", null, owner2);
         inactiveShop.setActive(false);
+        inactiveShop.setStatus(ShopStatus.APPROVED);
         inactiveShop.setRating(3.0);
         inactiveShop = shopRepository.save(inactiveShop);
     }
@@ -196,7 +202,19 @@ class ShopApiTests {
     }
 
     @Test
-    @DisplayName("7. SHOP_OWNER can create shop (201 Created)")
+    @DisplayName("6b. ADMIN cannot create shop (403 Forbidden)")
+    void adminCannotCreateShop() throws Exception {
+        CreateShopRequest request = new CreateShopRequest("Admin Shop", "Desc", "Address", "9876543210", "admin@shop.com", null, 15.0, 80.0);
+
+        mockMvc.perform(post("/api/shops")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("7. SHOP_OWNER can create shop (201 Created) and starts PENDING")
     void shopOwnerCanCreateShop() throws Exception {
         CreateShopRequest request = new CreateShopRequest(
                 "Fresh Fruit Corner",
@@ -216,7 +234,8 @@ class ShopApiTests {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.name").value("Fresh Fruit Corner"))
-                .andExpect(jsonPath("$.active").value(true))
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.active").value(false))
                 .andExpect(jsonPath("$.rating").value(0.0))
                 .andExpect(jsonPath("$.ownerId").value(owner1.getId()))
                 .andExpect(jsonPath("$.owner.email").value(OWNER1_EMAIL));
@@ -407,22 +426,102 @@ class ShopApiTests {
     }
 
     @Test
-    @DisplayName("18. ADMIN can deactivate a shop via DELETE /api/admin/shops/{id} (soft-deactivation)")
-    void adminCanDeactivateShopSoftly() throws Exception {
+    @DisplayName("18. ADMIN can remove a shop via DELETE /api/admin/shops/{id}")
+    void adminCanRemoveShop() throws Exception {
         mockMvc.perform(delete("/api/admin/shops/" + activeShop1.getId())
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Shop deactivated successfully"));
+                .andExpect(jsonPath("$.message").value("Shop removed successfully"));
 
-        // Verify shop is still in DB but active = false
-        Shop inDb = shopRepository.findById(activeShop1.getId()).orElseThrow();
-        assertThat(inDb.getActive()).isFalse();
+        // Verify shop is deleted from DB
+        assertThat(shopRepository.findById(activeShop1.getId())).isEmpty();
 
         // Verify it disappears from public discovery
         mockMvc.perform(get("/api/shops"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[?(@.name == 'Green Grocery')]").doesNotExist());
+
+        // Verify it disappears from owner's shops
+        mockMvc.perform(get("/api/shops/my")
+                        .header("Authorization", "Bearer " + owner1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[?(@.name == 'Green Grocery')]").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("18b. ADMIN can approve a pending shop via PATCH /api/admin/shops/{id}/approve")
+    void adminCanApprovePendingShop() throws Exception {
+        Shop pendingShop = new Shop("Pending Bakery", "Fresh bread", "99 Road", "9876500001", "p@example.com", null, owner1);
+        pendingShop.setStatus(ShopStatus.PENDING);
+        pendingShop.setActive(false);
+        pendingShop = shopRepository.save(pendingShop);
+
+        mockMvc.perform(patch("/api/admin/shops/" + pendingShop.getId() + "/approve")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(pendingShop.getId()))
+                .andExpect(jsonPath("$.status").value("APPROVED"))
+                .andExpect(jsonPath("$.active").value(true));
+
+        Shop inDb = shopRepository.findById(pendingShop.getId()).orElseThrow();
+        assertThat(inDb.getStatus()).isEqualTo(ShopStatus.APPROVED);
+        assertThat(inDb.getActive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("18c. Non-admin cannot approve shop (403 Forbidden)")
+    void nonAdminCannotApproveShop() throws Exception {
+        mockMvc.perform(patch("/api/admin/shops/" + activeShop1.getId() + "/approve")
+                        .header("Authorization", "Bearer " + owner1Token))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(patch("/api/admin/shops/" + activeShop1.getId() + "/approve")
+                        .header("Authorization", "Bearer " + customerToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("18d. SHOP_OWNER cannot remove shop through admin endpoint (403 Forbidden)")
+    void shopOwnerCannotRemoveShopThroughAdminEndpoint() throws Exception {
+        mockMvc.perform(delete("/api/admin/shops/" + activeShop1.getId())
+                        .header("Authorization", "Bearer " + owner1Token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("18e. Shop Owner can register again after removal, starts PENDING, and Admin approves again")
+    void shopOwnerCanRegisterAgainAfterRemoval() throws Exception {
+        // 1. Remove activeShop1 belonging to owner1
+        mockMvc.perform(delete("/api/admin/shops/" + activeShop1.getId())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+        assertThat(shopRepository.findById(activeShop1.getId())).isEmpty();
+
+        // 2. Owner1 registers a shop again
+        CreateShopRequest newReq = new CreateShopRequest("Green Grocery Reborn", "Back again", "10 Market Street", "9876500001", "green2@example.com", null, 15.5, 80.0);
+        String createRes = mockMvc.perform(post("/api/shops")
+                        .header("Authorization", "Bearer " + owner1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(newReq)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.active").value(false))
+                .andReturn().getResponse().getContentAsString();
+
+        ShopResponse createdShop = objectMapper.readValue(createRes, ShopResponse.class);
+
+        // 3. Admin approves the re-registered shop
+        mockMvc.perform(patch("/api/admin/shops/" + createdShop.id() + "/approve")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APPROVED"))
+                .andExpect(jsonPath("$.active").value(true));
+
+        Shop reapproved = shopRepository.findById(createdShop.id()).orElseThrow();
+        assertThat(reapproved.getStatus()).isEqualTo(ShopStatus.APPROVED);
+        assertThat(reapproved.getActive()).isTrue();
     }
 
     @Test

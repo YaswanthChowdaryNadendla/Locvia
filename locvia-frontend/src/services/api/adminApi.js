@@ -188,6 +188,26 @@ export const deleteUser = async (userId) => {
 
 export const deleteAdminUser = deleteUser;
 
+/**
+ * Approves a registered shop.
+ * PATCH /api/admin/shops/{id}/approve
+ * @param {string|number} shopId
+ * @returns {Promise<Object>}
+ */
+export const approveShop = async (shopId) => {
+  return axiosClient.patch(`${ENDPOINTS.ADMIN.SHOPS}/${shopId}/approve`);
+};
+
+/**
+ * Permanently removes a registered shop.
+ * DELETE /api/admin/shops/{id}
+ * @param {string|number} shopId
+ * @returns {Promise<Object>}
+ */
+export const deleteShop = async (shopId) => {
+  return axiosClient.delete(ENDPOINTS.ADMIN.SHOP_BY_ID(shopId));
+};
+
 export default {
   getUsers,
   updateUserStatus,
@@ -197,6 +217,8 @@ export default {
   deleteAdminUser,
   getShops,
   updateShopStatus,
+  approveShop,
+  deleteShop,
   getCategories,
   createCategory,
   updateCategory,

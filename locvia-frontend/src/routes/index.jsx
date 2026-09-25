@@ -48,6 +48,7 @@ import ShopOwnerInventoryPage from '../pages/shop-owner/ShopOwnerInventoryPage';
 import ShopOwnerOrdersPage from '../pages/shop-owner/ShopOwnerOrdersPage';
 import ShopOwnerOrderDetailsPage from '../pages/shop-owner/ShopOwnerOrderDetailsPage';
 import ShopOwnerShopProfilePage from '../pages/shop-owner/ShopOwnerShopProfilePage';
+import AddShopPage from '../pages/shop-owner/AddShopPage';
 import ShopOwnerProfilePage from '../pages/shop-owner/ShopOwnerProfilePage';
 
 // Delivery Partner Module 24, 25, 26, 27 & 28 Imports
@@ -644,6 +645,20 @@ const AppRoutes = () => {
               </ShopOwnerLayout>
             </ShopOwnerProtectedRoute>
           }
+        />
+        <Route
+          path="/shop-owner/add-shop"
+          element={
+            <ShopOwnerProtectedRoute>
+              <ShopOwnerLayout>
+                <AddShopPage />
+              </ShopOwnerLayout>
+            </ShopOwnerProtectedRoute>
+          }
+        />
+        <Route
+          path="/shop/add-shop"
+          element={<Navigate to="/shop-owner/add-shop" replace />}
         />
         <Route
           path="/shop/settings"

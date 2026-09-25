@@ -1,6 +1,7 @@
 package com.locvia.dto;
 
 import com.locvia.entity.Shop;
+import com.locvia.entity.ShopStatus;
 
 import java.time.LocalDateTime;
 
@@ -20,6 +21,7 @@ public record ShopResponse(
         Double longitude,
         Double rating,
         Boolean active,
+        String status,
         Long ownerId,
         UserSummaryDto owner,
         LocalDateTime createdAt,
@@ -45,6 +47,9 @@ public record ShopResponse(
             ownerSummary = UserSummaryDto.fromEntity(shop.getOwner());
         }
 
+        String statusStr = shop.getStatus() != null ? shop.getStatus().name()
+                : (Boolean.TRUE.equals(shop.getActive()) ? "APPROVED" : "PENDING");
+
         return new ShopResponse(
                 shop.getId(),
                 shop.getName(),
@@ -57,6 +62,7 @@ public record ShopResponse(
                 shop.getLongitude(),
                 shop.getRating(),
                 shop.getActive(),
+                statusStr,
                 ownerId,
                 ownerSummary,
                 shop.getCreatedAt(),

@@ -41,6 +41,10 @@ public class Shop {
     @Column(nullable = false)
     private Boolean active = true;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 30)
+    private ShopStatus status = ShopStatus.PENDING;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
@@ -68,7 +72,8 @@ public class Shop {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
-        if (this.active == null) this.active = true;
+        if (this.status == null) this.status = ShopStatus.PENDING;
+        if (this.active == null) this.active = (this.status == ShopStatus.APPROVED);
         if (this.rating == null) this.rating = 0.0;
     }
 
@@ -163,6 +168,14 @@ public class Shop {
 
     public void setActive(Boolean active) {
         this.active = active;
+    }
+
+    public ShopStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(ShopStatus status) {
+        this.status = status;
     }
 
     public User getOwner() {

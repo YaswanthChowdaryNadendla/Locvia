@@ -2,6 +2,7 @@
 // Module 20 — Dedicated Shop Profile Management Page for Shop Owners
 
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useShopOwnerAuth } from '../../modules/shop-owner/auth/ShopOwnerAuthContext';
 import { useAuth } from '../../context/AuthContext';
 import { getOwnerShop, updateShopDetails } from '../../services/shopOwnerService';
@@ -283,10 +284,32 @@ export default function ShopOwnerShopProfilePage() {
 
   if (!ownerShop) {
     return (
-      <div style={{ maxWidth: '800px', margin: '2rem auto', padding: '2rem', textAlign: 'center', backgroundColor: '#FFFFFF', borderRadius: '16px', border: '1px solid #E5E7EB' }}>
-        <Store size={48} style={{ color: '#9CA3AF', marginBottom: '1rem' }} />
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text)' }}>Shop Not Found</h2>
-        <p style={{ color: '#6B7280', marginTop: '4px' }}>No shop is currently associated with this account. Please register your shop first.</p>
+      <div style={{ maxWidth: '800px', margin: '2rem auto', padding: '3rem 2rem', textAlign: 'center', backgroundColor: '#FFFFFF', borderRadius: '16px', border: '1px solid #E5E7EB', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#F0FDF4', color: '#16A34A', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem auto' }}>
+          <Store size={36} />
+        </div>
+        <h2 style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--color-text)', margin: '0 0 8px 0' }}>No Shop Associated With Account</h2>
+        <p style={{ color: '#6B7280', maxWidth: '440px', margin: '0 auto 1.5rem auto', fontSize: '0.925rem', lineHeight: 1.5 }}>
+          You do not currently have a registered shop, or your shop was recently removed by an administrator. Please register your shop to start selling.
+        </p>
+        <Link
+          to="/shop-owner/add-shop"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 22px',
+            borderRadius: '8px',
+            background: 'var(--color-primary, #16A34A)',
+            color: '#FFFFFF',
+            fontWeight: 700,
+            fontSize: '0.9rem',
+            textDecoration: 'none',
+            boxShadow: '0 2px 4px rgba(22, 163, 74, 0.2)',
+          }}
+        >
+          <span>Register New Shop</span>
+        </Link>
       </div>
     );
   }
@@ -327,6 +350,32 @@ export default function ShopOwnerShopProfilePage() {
         >
           {notification.type === 'error' ? <AlertTriangle size={18} /> : <CheckCircle size={18} />}
           {notification.message}
+        </div>
+      )}
+
+      {/* Pending Approval Notice */}
+      {ownerShop.status === 'PENDING' && (
+        <div
+          style={{
+            backgroundColor: '#FFFBEB',
+            border: '1px solid #FDE68A',
+            borderRadius: '12px',
+            padding: '14px 18px',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+          }}
+        >
+          <Clock size={22} color="#D97706" style={{ flexShrink: 0 }} />
+          <div>
+            <strong style={{ color: '#92400E', fontSize: '0.95rem', display: 'block', marginBottom: '2px' }}>
+              Shop Pending Administrator Approval
+            </strong>
+            <span style={{ color: '#78350F', fontSize: '0.875rem' }}>
+              Your shop registration has been submitted and is awaiting administrator approval. You can review and update your shop details below.
+            </span>
+          </div>
         </div>
       )}
 

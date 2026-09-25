@@ -4,13 +4,9 @@ import com.locvia.dto.AdminUpdateShopRequest;
 import com.locvia.dto.CreateShopRequest;
 import com.locvia.dto.ShopResponse;
 import com.locvia.dto.UpdateShopRequest;
-import com.locvia.entity.AccountStatus;
-import com.locvia.entity.Shop;
-import com.locvia.entity.User;
-import com.locvia.entity.UserRole;
+import com.locvia.entity.*;
 import com.locvia.exception.ResourceNotFoundException;
-import com.locvia.repository.ShopRepository;
-import com.locvia.repository.UserRepository;
+import com.locvia.repository.*;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,10 +22,26 @@ public class ShopService {
 
     private final ShopRepository shopRepository;
     private final UserRepository userRepository;
+    private final ProductRepository productRepository;
+    private final InventoryRepository inventoryRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final NotificationRepository notificationRepository;
+    private final ReviewRepository reviewRepository;
 
-    public ShopService(ShopRepository shopRepository, UserRepository userRepository) {
+    public ShopService(ShopRepository shopRepository,
+                       UserRepository userRepository,
+                       ProductRepository productRepository,
+                       InventoryRepository inventoryRepository,
+                       OrderItemRepository orderItemRepository,
+                       NotificationRepository notificationRepository,
+                       ReviewRepository reviewRepository) {
         this.shopRepository = shopRepository;
         this.userRepository = userRepository;
+        this.productRepository = productRepository;
+        this.inventoryRepository = inventoryRepository;
+        this.orderItemRepository = orderItemRepository;
+        this.notificationRepository = notificationRepository;
+        this.reviewRepository = reviewRepository;
     }
 
     /**
@@ -70,7 +82,7 @@ public class ShopService {
     public ShopResponse createShop(CreateShopRequest request, String ownerEmail) {
         User owner = findUserByEmail(ownerEmail);
 
-        if (owner.getRole() != UserRole.SHOP_OWNER && owner.getRole() != UserRole.ADMIN) {
+        if (owner.getRole() != UserRole.SHOP_OWNER) {
             throw new AccessDeniedException("Only registered shop owners can create shops");
         }
 
@@ -90,7 +102,8 @@ public class ShopService {
         shop.setImageUrl(request.getImageUrl());
         shop.setLatitude(request.getLatitude());
         shop.setLongitude(request.getLongitude());
-        shop.setActive(true);
+        shop.setActive(false);
+        shop.setStatus(ShopStatus.PENDING);
         shop.setRating(0.0);
         shop.setOwner(owner);
 
@@ -287,16 +300,78 @@ public class ShopService {
     }
 
     /**
-     * Safely deactivates a shop without hard-deleting relational records (orders, products, reviews).
+     * Approves a registered shop for administrators.
+     * Sets status to APPROVED and active to true.
+     *
+     * @param id target shop ID
+     * @return updated ShopResponse
+     */
+    @Transactional
+    public ShopResponse approveShopForAdmin(Long id) {
+        Shop shop = shopRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Shop not found with id: " + id));
+        shop.setStatus(ShopStatus.APPROVED);
+        shop.setActive(true);
+        Shop updated = shopRepository.save(shop);
+        return ShopResponse.fromEntity(updated);
+    }
+
+    /**
+     * Permanently removes a registered shop and cleans up relational records
+     * so that the shop is completely removed and the owner can register again.
+     *
+     * @param id target shop ID
+     */
+    @Transactional
+    public void deleteShopForAdmin(Long id) {
+        Shop shop = shopRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Shop not found with id: " + id));
+
+        // 1. Delete notifications for this shop
+        List<Notification> notifications = notificationRepository.findByShopId(shop.getId());
+        if (!notifications.isEmpty()) {
+            notificationRepository.deleteAll(notifications);
+        }
+
+        // 2. Delete reviews for this shop
+        List<Review> reviews = reviewRepository.findByShopId(shop.getId());
+        if (!reviews.isEmpty()) {
+            reviewRepository.deleteAll(reviews);
+        }
+
+        // 3. Clean up products belonging to this shop
+        List<Product> products = productRepository.findByShopId(shop.getId());
+        for (Product product : products) {
+            // Nullify product references in historical order items
+            List<OrderItem> orderItems = orderItemRepository.findByProductId(product.getId());
+            for (OrderItem item : orderItems) {
+                item.setProduct(null);
+                orderItemRepository.save(item);
+            }
+            // Delete reviews for this product
+            List<Review> prodReviews = reviewRepository.findByProductId(product.getId());
+            if (!prodReviews.isEmpty()) {
+                reviewRepository.deleteAll(prodReviews);
+            }
+            // Delete inventory for this product
+            inventoryRepository.findByProductId(product.getId())
+                    .ifPresent(inventoryRepository::delete);
+            // Delete product
+            productRepository.delete(product);
+        }
+
+        // 4. Finally, remove the shop
+        shopRepository.delete(shop);
+    }
+
+    /**
+     * Backward-compatible alias for deleteShopForAdmin.
      *
      * @param id target shop ID
      */
     @Transactional
     public void deactivateShopForAdmin(Long id) {
-        Shop shop = shopRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Shop not found with id: " + id));
-        shop.setActive(false);
-        shopRepository.save(shop);
+        deleteShopForAdmin(id);
     }
 
     private User findUserByEmail(String email) {

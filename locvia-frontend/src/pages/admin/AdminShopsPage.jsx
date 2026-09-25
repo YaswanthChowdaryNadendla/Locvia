@@ -26,6 +26,8 @@ import {
 } from 'lucide-react';
 import {
   getAllShops,
+  approveShop,
+  removeShop,
   updateShopStatus,
   calculateShopStats,
   getShopInitials,
@@ -41,6 +43,8 @@ const AdminShopsPage = () => {
   const [shopsList, setShopsList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [locationFilter, setLocationFilter] = useState('ALL');
@@ -51,14 +55,25 @@ const AdminShopsPage = () => {
   // Modals & Toast State
   const [selectedShopForDetails, setSelectedShopForDetails] = useState(null);
   const [shopToToggleStatus, setShopToToggleStatus] = useState(null);
-  const [showAddShopModal, setShowAddShopModal] = useState(false);
+  const [shopToRemove, setShopToRemove] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
   // Load shops on mount
+  const loadShops = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getAllShops();
+      setShopsList(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to load shops:', err);
+      setShopsList([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const data = getAllShops();
-    setShopsList(data);
-    setIsLoading(false);
+    loadShops();
   }, []);
 
   // Clear toast
@@ -171,6 +186,41 @@ const AdminShopsPage = () => {
     }
   };
 
+  // Approve pending shop handler
+  const handleApproveShop = async (shop) => {
+    if (isApproving) return;
+    setIsApproving(true);
+    try {
+      await approveShop(shop.id);
+      setShopsList((prev) =>
+        prev.map((s) => (String(s.id) === String(shop.id) ? { ...s, status: 'APPROVED', active: true } : s))
+      );
+      setToastMessage(`Shop "${shop.name}" approved successfully.`);
+    } catch (err) {
+      console.error('Failed to approve shop:', err);
+      setToastMessage(err?.message || 'Failed to approve shop.');
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
+  // Remove shop handler
+  const handleConfirmRemoveShop = async () => {
+    if (!shopToRemove || isRemoving) return;
+    setIsRemoving(true);
+    try {
+      await removeShop(shopToRemove.id);
+      setShopsList((prev) => prev.filter((s) => String(s.id) !== String(shopToRemove.id)));
+      setToastMessage(`Shop "${shopToRemove.name}" removed successfully.`);
+      setShopToRemove(null);
+    } catch (err) {
+      console.error('Failed to remove shop:', err);
+      setToastMessage(err?.message || 'Failed to remove shop.');
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
   const handleClearFilters = () => {
     setSearchQuery('');
     setStatusFilter('ALL');
@@ -225,28 +275,6 @@ const AdminShopsPage = () => {
             Manage and monitor shops registered on the Locvia platform.
           </p>
         </div>
-
-        {/* Add Shop Action Button */}
-        <button
-          onClick={() => setShowAddShopModal(true)}
-          style={{
-            padding: '10px 18px',
-            borderRadius: '8px',
-            background: 'var(--color-primary, #16A34A)',
-            color: '#FFFFFF',
-            border: 'none',
-            fontSize: '14px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            boxShadow: '0 2px 4px rgba(22, 163, 74, 0.2)',
-          }}
-        >
-          <Plus size={18} />
-          Add Shop
-        </button>
       </div>
 
       {/* Statistics Cards Grid */}
@@ -559,6 +587,7 @@ const AdminShopsPage = () => {
               }}
             >
               <option value="ALL">All Statuses</option>
+              <option value="PENDING">Pending</option>
               <option value="ACTIVE">Active</option>
               <option value="INACTIVE">Inactive</option>
             </select>
@@ -854,30 +883,50 @@ const AdminShopsPage = () => {
 
                       {/* Status */}
                       <td style={{ padding: '14px 18px' }}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '4px 10px',
-                            borderRadius: '20px',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            background: isActive ? '#E8F5E9' : '#FFEBEE',
-                            color: isActive ? '#2E7D32' : '#C62828',
-                            border: isActive ? '1px solid #C8E6C9' : '1px solid #FFCDD2',
-                          }}
-                        >
+                        {s.status === 'PENDING' ? (
                           <span
                             style={{
-                              width: '6px',
-                              height: '6px',
-                              borderRadius: '50%',
-                              background: isActive ? '#2E7D32' : '#C62828',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '4px 10px',
+                              borderRadius: '20px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              background: '#FFFBEB',
+                              color: '#B45309',
+                              border: '1px solid #FDE68A',
                             }}
-                          />
-                          {isActive ? 'Active' : 'Inactive'}
-                        </span>
+                          >
+                            <Clock size={12} />
+                            Pending Approval
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '4px 10px',
+                              borderRadius: '20px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              background: isActive ? '#E8F5E9' : '#FFEBEE',
+                              color: isActive ? '#2E7D32' : '#C62828',
+                              border: isActive ? '1px solid #C8E6C9' : '1px solid #FFCDD2',
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                background: isActive ? '#2E7D32' : '#C62828',
+                              }}
+                            />
+                            {isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        )}
                       </td>
 
                       {/* Actions */}
@@ -903,20 +952,47 @@ const AdminShopsPage = () => {
                             Details
                           </button>
 
+                          {s.status === 'PENDING' && (
+                            <button
+                              onClick={() => handleApproveShop(s)}
+                              disabled={isApproving}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                border: 'none',
+                                background: '#E8F5E9',
+                                color: '#2E7D32',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: isApproving ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                            >
+                              <CheckCircle2 size={13} />
+                              Approve
+                            </button>
+                          )}
+
                           <button
-                            onClick={() => setShopToToggleStatus(s)}
+                            onClick={() => setShopToRemove(s)}
                             style={{
                               padding: '6px 12px',
                               borderRadius: '6px',
                               border: 'none',
-                              background: isActive ? '#FFEBEE' : '#E8F5E9',
-                              color: isActive ? '#C62828' : '#2E7D32',
+                              background: '#FFEBEE',
+                              color: '#C62828',
                               fontSize: '12px',
                               fontWeight: 600,
                               cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
                             }}
                           >
-                            {isActive ? 'Deactivate' : 'Activate'}
+                            <XCircle size={13} />
+                            Remove
                           </button>
                         </div>
                       </td>
@@ -1005,18 +1081,34 @@ const AdminShopsPage = () => {
                       </div>
                     </div>
 
-                    <span
-                      style={{
-                        padding: '3px 8px',
-                        borderRadius: '12px',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        background: isActive ? '#E8F5E9' : '#FFEBEE',
-                        color: isActive ? '#2E7D32' : '#C62828',
-                      }}
-                    >
-                      {isActive ? 'Active' : 'Inactive'}
-                    </span>
+                    {s.status === 'PENDING' ? (
+                      <span
+                        style={{
+                          padding: '3px 8px',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          background: '#FFFBEB',
+                          color: '#B45309',
+                          border: '1px solid #FDE68A',
+                        }}
+                      >
+                        Pending
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          padding: '3px 8px',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          background: isActive ? '#E8F5E9' : '#FFEBEE',
+                          color: isActive ? '#2E7D32' : '#C62828',
+                        }}
+                      >
+                        {isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    )}
                   </div>
 
                   {/* Details Grid */}
@@ -1061,11 +1153,12 @@ const AdminShopsPage = () => {
                   </div>
 
                   {/* Mobile Actions */}
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <button
                       onClick={() => setSelectedShopForDetails(s)}
                       style={{
                         flex: 1,
+                        minWidth: '80px',
                         padding: '8px',
                         borderRadius: '6px',
                         border: '1px solid var(--color-border, #CBD5E1)',
@@ -1081,24 +1174,56 @@ const AdminShopsPage = () => {
                       }}
                     >
                       <Eye size={14} />
-                      View Details
+                      Details
                     </button>
 
+                    {s.status === 'PENDING' && (
+                      <button
+                        onClick={() => handleApproveShop(s)}
+                        disabled={isApproving}
+                        style={{
+                          flex: 1,
+                          minWidth: '80px',
+                          padding: '8px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: '#E8F5E9',
+                          color: '#2E7D32',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: isApproving ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <CheckCircle2 size={13} />
+                        Approve
+                      </button>
+                    )}
+
                     <button
-                      onClick={() => setShopToToggleStatus(s)}
+                      onClick={() => setShopToRemove(s)}
                       style={{
                         flex: 1,
+                        minWidth: '80px',
                         padding: '8px',
                         borderRadius: '6px',
                         border: 'none',
-                        background: isActive ? '#FFEBEE' : '#E8F5E9',
-                        color: isActive ? '#C62828' : '#2E7D32',
+                        background: '#FFEBEE',
+                        color: '#C62828',
                         fontSize: '12px',
                         fontWeight: 600,
                         cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px',
                       }}
                     >
-                      {isActive ? 'Deactivate' : 'Activate'}
+                      <XCircle size={13} />
+                      Remove
                     </button>
                   </div>
                 </div>
@@ -1491,8 +1616,8 @@ const AdminShopsPage = () => {
         </div>
       )}
 
-      {/* ── Add Shop Info Modal ── */}
-      {showAddShopModal && (
+      {/* ── Remove Shop Confirmation Modal ── */}
+      {shopToRemove && (
         <div
           style={{
             position: 'fixed',
@@ -1510,7 +1635,7 @@ const AdminShopsPage = () => {
             style={{
               background: '#FFFFFF',
               borderRadius: '16px',
-              maxWidth: '440px',
+              maxWidth: '460px',
               width: '100%',
               padding: '24px',
               boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
@@ -1522,41 +1647,63 @@ const AdminShopsPage = () => {
                 width: '52px',
                 height: '52px',
                 borderRadius: '50%',
-                background: '#E0F2FE',
-                color: '#0284C7',
+                background: '#FEE2E2',
+                color: '#DC2626',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 16px auto',
               }}
             >
-              <Info size={28} />
+              <AlertTriangle size={28} />
             </div>
 
             <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: 700, color: '#0F172A' }}>
-              Add New Shop
+              Remove Shop
             </h3>
 
-            <p style={{ fontSize: '14px', color: '#64748B', margin: '0 0 24px 0', lineHeight: 1.5 }}>
-              Shop onboarding and registration workflow will be integrated with Spring Boot REST APIs during the backend integration phase.
+            <p style={{ fontSize: '14px', color: '#64748B', margin: '0 0 20px 0', lineHeight: 1.5 }}>
+              Are you sure you want to remove this shop?
+              <br />
+              The Shop Owner will need to register the shop again and receive admin approval.
             </p>
 
-            <button
-              onClick={() => setShowAddShopModal(false)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                borderRadius: '8px',
-                border: 'none',
-                background: 'var(--color-primary, #16A34A)',
-                color: '#FFFFFF',
-                fontSize: '14px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Got it
-            </button>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button
+                onClick={() => setShopToRemove(null)}
+                disabled={isRemoving}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: '8px',
+                  border: '1px solid #CBD5E1',
+                  background: '#FFFFFF',
+                  color: '#475569',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmRemoveShop}
+                disabled={isRemoving}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: '#DC2626',
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: isRemoving ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {isRemoving ? 'Removing...' : 'Confirm Remove'}
+              </button>
+            </div>
           </div>
         </div>
       )}
