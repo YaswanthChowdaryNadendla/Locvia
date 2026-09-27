@@ -10,7 +10,7 @@ import {
   updateOwnerProduct,
   deleteOwnerProduct,
 } from '../../services/shopOwnerService';
-import { categories } from '../../data/categories';
+import { getCategories } from '../../services/api/categoryApi';
 import ProductImageUploader from '../../components/shop-owner/ProductImageUploader';
 import { normalizeImageUrl, handleImageError } from '../../utils/imageUtils';
 import TableSkeleton from '../../components/common/loaders/TableSkeleton';
@@ -38,6 +38,11 @@ export default function ShopOwnerProductsPage() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'INACTIVE' | 'LOW_STOCK' | 'OUT_OF_STOCK'
 
+  // Backend product categories
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [categoryError, setCategoryError] = useState(null);
+
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -49,8 +54,8 @@ export default function ShopOwnerProductsPage() {
   // Form State
   const [formData, setFormData] = useState({
     name: '',
-    category: categories[0]?.name || 'Grocery & Staples',
-    categoryId: categories[0]?.id || 10,
+    category: '',
+    categoryId: '',
     price: '',
     mrp: '',
     unit: '1 kg',
@@ -63,6 +68,26 @@ export default function ShopOwnerProductsPage() {
 
   const [formErrors, setFormErrors] = useState({});
   const [notification, setNotification] = useState(null);
+
+  const loadCategories = async () => {
+    try {
+      setCategoriesLoading(true);
+      setCategoryError(null);
+      const data = await getCategories();
+      const list = Array.isArray(data) ? data : (data?.content || []);
+      setCategories(list);
+    } catch (err) {
+      console.error('Failed to load categories:', err);
+      setCategoryError('Failed to load product categories.');
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
+
+  // Load categories on mount
+  useEffect(() => {
+    loadCategories();
+  }, []);
 
   // Load owner's shop on mount
   useEffect(() => {
@@ -113,11 +138,13 @@ export default function ShopOwnerProductsPage() {
 
   // Filtered Products
   const filteredProducts = (products || []).filter((p) => {
+    const productCategory = p.categoryName || p.category || '';
     const matchesSearch =
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.category && p.category.toLowerCase().includes(searchTerm.toLowerCase()));
+      (productCategory && productCategory.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
+    const matchesCategory =
+      selectedCategory === 'All' || productCategory.toLowerCase() === selectedCategory.toLowerCase();
 
     let matchesStatus = true;
     const stockVal = p.stock !== undefined ? p.stock : 0;
@@ -160,7 +187,12 @@ export default function ShopOwnerProductsPage() {
       errs.stock = 'Stock must be greater than or equal to 0.';
     }
 
-    // 5. Image
+    // 5. Category
+    if (!formData.categoryId) {
+      errs.category = 'Please select a valid product category.';
+    }
+
+    // 6. Image
     if (!formData.imageUrl) {
       errs.image = 'Product image is required.';
     }
@@ -171,10 +203,12 @@ export default function ShopOwnerProductsPage() {
 
   // Modal Open Handlers
   const handleOpenAddModal = () => {
+    setEditingProduct(null);
+    const defaultCat = categories.length > 0 ? categories[0] : null;
     setFormData({
       name: '',
-      category: categories[0]?.name || 'Grocery & Staples',
-      categoryId: categories[0]?.id || 10,
+      category: defaultCat ? defaultCat.name : '',
+      categoryId: defaultCat ? defaultCat.id : '',
       price: '',
       mrp: '',
       unit: '1 kg',
@@ -190,11 +224,21 @@ export default function ShopOwnerProductsPage() {
 
   const handleOpenEditModal = (product) => {
     setEditingProduct(product);
+    const matchedCat = categories.find(
+      (c) =>
+        c.id === product.categoryId ||
+        (c.name && (c.name === product.categoryName || c.name === product.category))
+    );
+    const resolvedCatId = product.categoryId || (matchedCat ? matchedCat.id : (categories[0]?.id || ''));
+    const resolvedCatName = matchedCat
+      ? matchedCat.name
+      : (product.categoryName || product.category || categories[0]?.name || '');
+
     setFormData({
       name: product.name || '',
-      category: product.category || categories[0]?.name || 'Grocery & Staples',
-      categoryId: product.categoryId || 10,
-      price: product.price || '',
+      category: resolvedCatName,
+      categoryId: resolvedCatId,
+      price: product.price !== undefined ? product.price : '',
       mrp: product.mrp || product.originalPrice || product.price || '',
       unit: product.unit || '1 kg',
       stock: product.stock !== undefined ? product.stock : 25,
@@ -204,6 +248,7 @@ export default function ShopOwnerProductsPage() {
       isAvailable: product.isAvailable !== undefined ? product.isAvailable : true,
     });
     setFormErrors({});
+    setIsAddModalOpen(true);
   };
 
   // Image Uploader Handler
@@ -238,7 +283,7 @@ export default function ShopOwnerProductsPage() {
         name: formData.name.trim(),
         description: formData.description.trim(),
         category: formData.category,
-        categoryId: formData.categoryId,
+        categoryId: Number(formData.categoryId),
         price,
         mrp,
         originalPrice: mrp,
@@ -653,7 +698,7 @@ export default function ShopOwnerProductsPage() {
                             fontWeight: 600,
                           }}
                         >
-                          {product.category || 'Grocery & Staples'}
+                          {product.categoryName || product.category || 'General'}
                         </span>
                       </td>
 
@@ -779,25 +824,65 @@ export default function ShopOwnerProductsPage() {
 
                 {/* Category Selection */}
                 <div>
-                  <label style={labelStyle}>Category *</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => {
-                      const selectedObj = categories.find((c) => c.name === e.target.value);
-                      setFormData({
-                        ...formData,
-                        category: e.target.value,
-                        categoryId: selectedObj ? selectedObj.id : 10,
-                      });
-                    }}
-                    style={inputStyle}
-                  >
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.name}>
-                        {cat.name}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={labelStyle}>Category *</label>
+                    {categoryError && (
+                      <button
+                        type="button"
+                        onClick={loadCategories}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--color-primary, #0c831f)',
+                          fontSize: '0.75rem',
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                        }}
+                      >
+                        Retry loading
+                      </button>
+                    )}
+                  </div>
+                  {categoriesLoading ? (
+                    <div style={{ ...inputStyle, color: '#6B7280', display: 'flex', alignItems: 'center' }}>
+                      Loading categories...
+                    </div>
+                  ) : (
+                    <select
+                      value={formData.categoryId || ''}
+                      onChange={(e) => {
+                        const selectedId = Number(e.target.value);
+                        const selectedObj = categories.find((c) => c.id === selectedId);
+                        setFormData({
+                          ...formData,
+                          categoryId: selectedId,
+                          category: selectedObj ? selectedObj.name : '',
+                        });
+                        if (formErrors.category) {
+                          setFormErrors((prev) => ({ ...prev, category: null }));
+                        }
+                      }}
+                      style={{
+                        ...inputStyle,
+                        borderColor: formErrors.category ? '#EF4444' : '#D1D5DB',
+                      }}
+                    >
+                      <option value="" disabled>
+                        Select a category
                       </option>
-                    ))}
-                  </select>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {formErrors.category && (
+                    <span style={errorTextStyle}>{formErrors.category}</span>
+                  )}
+                  {categoryError && !categoriesLoading && (
+                    <span style={errorTextStyle}>{categoryError}</span>
+                  )}
                 </div>
 
                 {/* Unit */}
