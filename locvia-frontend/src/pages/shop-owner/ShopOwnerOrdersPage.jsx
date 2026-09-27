@@ -56,7 +56,27 @@ export default function ShopOwnerOrdersPage() {
   const [modalConfig, setModalConfig] = useState(null);
 
   useEffect(() => {
-    getOwnerShop().then(shop => setOwnerShop(shop)).catch(() => setOwnerShop(null));
+    let isMounted = true;
+    getOwnerShop()
+      .then((shop) => {
+        if (isMounted) {
+          setOwnerShop(shop);
+          if (shop?.id) {
+            loadOrders(shop.id);
+          } else {
+            setLoading(false);
+          }
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setOwnerShop(null);
+          setLoading(false);
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const loadOrders = async (targetShopId) => {
@@ -64,7 +84,7 @@ export default function ShopOwnerOrdersPage() {
     if (shopId) {
       try {
         const data = await getOwnerOrders(shopId);
-        setOrders(data);
+        setOrders(Array.isArray(data) ? data : []);
       } catch {
         setOrders([]);
       } finally {
@@ -75,12 +95,6 @@ export default function ShopOwnerOrdersPage() {
     }
   };
 
-  useEffect(() => {
-    if (ownerShop?.id) {
-      loadOrders(ownerShop.id);
-    }
-  }, [ownerShop?.id]);
-
   const showToast = (message, type = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
@@ -89,6 +103,10 @@ export default function ShopOwnerOrdersPage() {
   // Status transition execution
   const executeStatusChange = async (orderId, newStatus, message) => {
     if (isUpdating) return;
+    if (!ownerShop?.id) {
+      showToast('No active shop found for this account.', 'error');
+      return;
+    }
     setIsUpdating(true);
     try {
       await updateOwnerOrderStatus(ownerShop.id, orderId, newStatus);
@@ -114,26 +132,27 @@ export default function ShopOwnerOrdersPage() {
   };
 
   // Metric Summary Counts
+  const orderList = Array.isArray(orders) ? orders : [];
   const newOrdersCount = useMemo(
-    () => orders.filter((o) => ['PLACED', 'CONFIRMED'].includes((o.orderStatus || 'PLACED').toUpperCase())).length,
-    [orders]
+    () => orderList.filter((o) => ['PLACED', 'CONFIRMED'].includes((o.orderStatus || 'PLACED').toUpperCase())).length,
+    [orderList]
   );
   const preparingCount = useMemo(
-    () => orders.filter((o) => (o.orderStatus || '').toUpperCase() === 'PREPARING').length,
-    [orders]
+    () => orderList.filter((o) => (o.orderStatus || '').toUpperCase() === 'PREPARING').length,
+    [orderList]
   );
   const readyCount = useMemo(
-    () => orders.filter((o) => (o.orderStatus || '').toUpperCase() === 'READY_FOR_PICKUP').length,
-    [orders]
+    () => orderList.filter((o) => (o.orderStatus || '').toUpperCase() === 'READY_FOR_PICKUP').length,
+    [orderList]
   );
   const completedCount = useMemo(
-    () => orders.filter((o) => (o.orderStatus || '').toUpperCase() === 'DELIVERED').length,
-    [orders]
+    () => orderList.filter((o) => (o.orderStatus || '').toUpperCase() === 'DELIVERED').length,
+    [orderList]
   );
 
   // Filtered Orders
   const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
+    return orderList.filter((order) => {
       const matchesSearch =
         String(order.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         String(order.orderId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -151,7 +170,7 @@ export default function ShopOwnerOrdersPage() {
 
       return matchesSearch && matchesStatus;
     });
-  }, [orders, activeTab, searchTerm]);
+  }, [orderList, activeTab, searchTerm]);
 
   // Helper for Status Badges
   const renderStatusBadge = (statusStr) => {
@@ -220,7 +239,7 @@ export default function ShopOwnerOrdersPage() {
           Orders
         </h1>
         <p style={{ color: '#6B7280', fontSize: '0.875rem', marginTop: '4px' }}>
-          Manage and fulfill orders containing products from <strong style={{ color: 'var(--color-primary)' }}>{ownerShop.name}</strong>
+          Manage and fulfill orders containing products from <strong style={{ color: 'var(--color-primary)' }}>{ownerShop?.name || 'Your Shop'}</strong>
         </p>
       </div>
 

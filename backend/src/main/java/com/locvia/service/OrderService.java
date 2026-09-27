@@ -4,6 +4,7 @@ import com.locvia.dto.*;
 import com.locvia.entity.*;
 import com.locvia.exception.ResourceNotFoundException;
 import com.locvia.repository.*;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +26,7 @@ public class OrderService {
     private final AddressRepository addressRepository;
     private final InventoryRepository inventoryRepository;
     private final UserRepository userRepository;
+    private final ShopRepository shopRepository;
 
     public OrderService(OrderRepository orderRepository,
                         OrderItemRepository orderItemRepository,
@@ -32,7 +34,8 @@ public class OrderService {
                         CartItemRepository cartItemRepository,
                         AddressRepository addressRepository,
                         InventoryRepository inventoryRepository,
-                        UserRepository userRepository) {
+                        UserRepository userRepository,
+                        ShopRepository shopRepository) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.cartRepository = cartRepository;
@@ -40,6 +43,7 @@ public class OrderService {
         this.addressRepository = addressRepository;
         this.inventoryRepository = inventoryRepository;
         this.userRepository = userRepository;
+        this.shopRepository = shopRepository;
     }
 
     /**
@@ -418,6 +422,138 @@ public class OrderService {
                 customerSummary,
                 itemResponses,
                 order.getSubtotal(),
+                order.getTotalAmount(),
+                order.getStatus(),
+                order.getPaymentStatus(),
+                order.getPaymentMethod(),
+                addressResponse,
+                order.getCreatedAt(),
+                order.getUpdatedAt()
+        );
+    }
+
+    /**
+     * Retrieves all orders containing items belonging to the specified shop.
+     * Strictly verifies that the authenticated caller owns the shop or is an administrator.
+     */
+    @Transactional(readOnly = true)
+    public List<AdminOrderResponse> getOrdersForShop(Long shopId, String callerEmail) {
+        User caller = getUserByEmail(callerEmail);
+        Shop shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shop not found with id: " + shopId));
+
+        if (caller.getRole() != UserRole.ADMIN && !shop.getOwner().getId().equals(caller.getId())) {
+            throw new AccessDeniedException("Access denied: You do not have permission to view orders for another owner's shop");
+        }
+
+        List<Order> orders = orderRepository.findAllByOrderByCreatedAtDesc();
+        List<AdminOrderResponse> responses = new ArrayList<>();
+
+        for (Order order : orders) {
+            boolean matchesShop = orderItemRepository.findByOrderId(order.getId())
+                    .stream()
+                    .anyMatch(item -> item.getProduct() != null && item.getProduct().getShop() != null
+                            && shopId.equals(item.getProduct().getShop().getId()));
+
+            if (matchesShop) {
+                responses.add(mapToShopOrderResponse(order, shopId));
+            }
+        }
+
+        return responses;
+    }
+
+    /**
+     * Retrieves full order details for a specific shop.
+     * Enforces shop ownership and verifies order relevance.
+     */
+    @Transactional(readOnly = true)
+    public AdminOrderResponse getOrderByIdForShop(Long shopId, Long orderId, String callerEmail) {
+        User caller = getUserByEmail(callerEmail);
+        Shop shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shop not found with id: " + shopId));
+
+        if (caller.getRole() != UserRole.ADMIN && !shop.getOwner().getId().equals(caller.getId())) {
+            throw new AccessDeniedException("Access denied: You do not have permission to view orders for another owner's shop");
+        }
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+
+        boolean matchesShop = orderItemRepository.findByOrderId(order.getId())
+                .stream()
+                .anyMatch(item -> item.getProduct() != null && item.getProduct().getShop() != null
+                        && shopId.equals(item.getProduct().getShop().getId()));
+
+        if (!matchesShop) {
+            throw new AccessDeniedException("Access denied: Order does not contain products from this shop");
+        }
+
+        return mapToShopOrderResponse(order, shopId);
+    }
+
+    /**
+     * Operationally updates fulfillment status for an order belonging to the shop.
+     * Enforces shop ownership.
+     */
+    @Transactional
+    public AdminOrderResponse updateOrderStatusForShop(Long shopId, Long orderId, OrderStatus newStatus, String callerEmail) {
+        User caller = getUserByEmail(callerEmail);
+        Shop shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shop not found with id: " + shopId));
+
+        if (caller.getRole() != UserRole.ADMIN && !shop.getOwner().getId().equals(caller.getId())) {
+            throw new AccessDeniedException("Access denied: You do not have permission to update orders for another owner's shop");
+        }
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+
+        boolean matchesShop = orderItemRepository.findByOrderId(order.getId())
+                .stream()
+                .anyMatch(item -> item.getProduct() != null && item.getProduct().getShop() != null
+                        && shopId.equals(item.getProduct().getShop().getId()));
+
+        if (!matchesShop) {
+            throw new AccessDeniedException("Access denied: Order does not contain products from this shop");
+        }
+
+        AdminOrderResponse updated = updateOrderStatusForAdmin(orderId, newStatus);
+        return mapToShopOrderResponse(order, shopId);
+    }
+
+    private AdminOrderResponse mapToShopOrderResponse(Order order, Long shopId) {
+        AdminOrderResponse.CustomerSummary customerSummary = null;
+        if (order.getUser() != null) {
+            customerSummary = new AdminOrderResponse.CustomerSummary(
+                    order.getUser().getId(),
+                    order.getUser().getName(),
+                    order.getUser().getEmail(),
+                    order.getUser().getPhone()
+            );
+        }
+
+        List<OrderItem> allItems = orderItemRepository.findByOrderId(order.getId());
+        List<OrderItemResponse> itemResponses = new ArrayList<>();
+        BigDecimal shopSubtotal = BigDecimal.ZERO;
+
+        for (OrderItem item : allItems) {
+            if (item.getProduct() != null && item.getProduct().getShop() != null
+                    && shopId.equals(item.getProduct().getShop().getId())) {
+                itemResponses.add(mapToOrderItemResponse(item));
+                if (item.getSubtotal() != null) {
+                    shopSubtotal = shopSubtotal.add(item.getSubtotal());
+                }
+            }
+        }
+
+        OrderAddressResponse addressResponse = mapToOrderAddressResponse(order);
+
+        return new AdminOrderResponse(
+                order.getId(),
+                customerSummary,
+                itemResponses,
+                shopSubtotal,
                 order.getTotalAmount(),
                 order.getStatus(),
                 order.getPaymentStatus(),

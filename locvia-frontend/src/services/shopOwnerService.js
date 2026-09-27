@@ -118,9 +118,9 @@ export const getOwnerOrders = async (shopId) => {
 /**
  * Fetches a single order for the shop owner.
  */
-export const getOwnerOrderById = async (_shopId, orderId) => {
+export const getOwnerOrderById = async (shopId, orderId) => {
   try {
-    return await orderApi.getOrderById(orderId);
+    return await orderApi.getShopOrderById(shopId, orderId);
   } catch {
     return null;
   }
@@ -129,8 +129,8 @@ export const getOwnerOrderById = async (_shopId, orderId) => {
 /**
  * Updates order status.
  */
-export const updateOwnerOrderStatus = async (_shopId, orderId, newStatus) => {
-  return orderApi.updateOrderStatus(orderId, newStatus);
+export const updateOwnerOrderStatus = async (shopId, orderId, newStatus) => {
+  return orderApi.updateOrderStatus(orderId, newStatus, shopId);
 };
 
 // ── Legacy synchronous stubs ──────────────────────────────────

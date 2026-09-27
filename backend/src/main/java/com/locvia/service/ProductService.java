@@ -5,12 +5,14 @@ import com.locvia.dto.CreateProductRequest;
 import com.locvia.dto.ProductResponse;
 import com.locvia.dto.UpdateProductRequest;
 import com.locvia.entity.Category;
+import com.locvia.entity.Inventory;
 import com.locvia.entity.Product;
 import com.locvia.entity.Shop;
 import com.locvia.entity.User;
 import com.locvia.entity.UserRole;
 import com.locvia.exception.ResourceNotFoundException;
 import com.locvia.repository.CategoryRepository;
+import com.locvia.repository.InventoryRepository;
 import com.locvia.repository.ProductRepository;
 import com.locvia.repository.ShopRepository;
 import com.locvia.repository.UserRepository;
@@ -34,6 +36,7 @@ public class ProductService {
     private final ShopRepository shopRepository;
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
+    private final InventoryRepository inventoryRepository;
     private final CloudinaryService cloudinaryService;
 
     public ProductService(
@@ -41,11 +44,13 @@ public class ProductService {
             ShopRepository shopRepository,
             CategoryRepository categoryRepository,
             UserRepository userRepository,
+            InventoryRepository inventoryRepository,
             CloudinaryService cloudinaryService) {
         this.productRepository = productRepository;
         this.shopRepository = shopRepository;
         this.categoryRepository = categoryRepository;
         this.userRepository = userRepository;
+        this.inventoryRepository = inventoryRepository;
         this.cloudinaryService = cloudinaryService;
     }
 
@@ -140,6 +145,9 @@ public class ProductService {
         product.setActive(true);
 
         Product saved = productRepository.save(product);
+        if (!inventoryRepository.existsByProductId(saved.getId())) {
+            inventoryRepository.save(new Inventory(saved, 25, 5));
+        }
         return ProductResponse.fromEntity(saved);
     }
 
@@ -365,6 +373,9 @@ public class ProductService {
         product.setActive(true);
 
         Product saved = productRepository.save(product);
+        if (!inventoryRepository.existsByProductId(saved.getId())) {
+            inventoryRepository.save(new Inventory(saved, 25, 5));
+        }
         return ProductResponse.fromEntity(saved);
     }
 

@@ -60,20 +60,36 @@ export const getOrderPayment = async (orderId) => {
 
 /**
  * Retrieves orders for a specific shop.
+ * GET /api/shops/{shopId}/orders
  * @param {string|number} shopId
  * @returns {Promise<Array<Object>>}
  */
 export const getShopOrders = async (shopId) => {
-  return axiosClient.get(ENDPOINTS.ADMIN.ORDERS, { params: { shopId } });
+  return axiosClient.get(ENDPOINTS.ORDERS.BY_SHOP(shopId));
 };
 
 /**
- * Updates order status.
+ * Retrieves single order details for a specific shop.
+ * GET /api/shops/{shopId}/orders/{orderId}
+ * @param {string|number} shopId
  * @param {string|number} orderId
- * @param {string} newStatus
  * @returns {Promise<Object>}
  */
-export const updateOrderStatus = async (orderId, newStatus) => {
+export const getShopOrderById = async (shopId, orderId) => {
+  return axiosClient.get(ENDPOINTS.ORDERS.SHOP_ORDER_DETAIL(shopId, orderId));
+};
+
+/**
+ * Updates order status for a shop or administration.
+ * @param {string|number} orderId
+ * @param {string} newStatus
+ * @param {string|number} [shopId]
+ * @returns {Promise<Object>}
+ */
+export const updateOrderStatus = async (orderId, newStatus, shopId) => {
+  if (shopId) {
+    return axiosClient.patch(ENDPOINTS.ORDERS.SHOP_ORDER_STATUS(shopId, orderId), { status: newStatus });
+  }
   return axiosClient.patch(ENDPOINTS.ADMIN.ORDER_STATUS(orderId), { status: newStatus });
 };
 
@@ -85,6 +101,7 @@ export default {
   getOrderDelivery,
   getOrderPayment,
   getShopOrders,
+  getShopOrderById,
   updateOrderStatus,
 };
 

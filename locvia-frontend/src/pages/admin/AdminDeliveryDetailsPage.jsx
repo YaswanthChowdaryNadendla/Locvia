@@ -1,7 +1,7 @@
 // src/pages/admin/AdminDeliveryDetailsPage.jsx
 // Detailed Admin Delivery Inspection Page (Module 34)
 
-import { useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -23,10 +23,35 @@ const AdminDeliveryDetailsPage = () => {
   const { deliveryId } = useParams();
   const navigate = useNavigate();
 
+  const [delivery, setDelivery] = useState(null);
+  const [loading, setLoading] = useState(true);
+
   // Fetch delivery details
-  const delivery = useMemo(() => {
-    return getDeliveryDetails(deliveryId);
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
+    getDeliveryDetails(deliveryId)
+      .then((data) => {
+        if (isMounted) setDelivery(data);
+      })
+      .catch((err) => {
+        console.error('Error fetching delivery details:', err);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+    return () => {
+      isMounted = false;
+    };
   }, [deliveryId]);
+
+  if (loading) {
+    return (
+      <div style={{ padding: '2rem 1rem', maxWidth: '800px', margin: '0 auto', textAlign: 'center', color: '#64748b' }}>
+        <p>Loading delivery details...</p>
+      </div>
+    );
+  }
 
   // Invalid Delivery ID Fallback
   if (!delivery) {
@@ -208,13 +233,13 @@ const AdminDeliveryDetailsPage = () => {
             </h3>
           </div>
 
-          {delivery.shops.map((shop, idx) => (
-            <div key={idx} style={{ marginBottom: '0.75rem', paddingBottom: '0.5rem', borderBottom: idx < delivery.shops.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+          {(delivery.shops || []).map((shop, idx) => (
+            <div key={idx} style={{ marginBottom: '0.75rem', paddingBottom: '0.5rem', borderBottom: idx < (delivery.shops?.length || 0) - 1 ? '1px solid #f1f5f9' : 'none' }}>
               <h4 style={{ fontWeight: '700', fontSize: '0.95rem', color: '#1e293b', margin: 0 }}>
                 {shop.name}
               </h4>
               <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
-                Pickup Address: Registered Merchant Location ({delivery.address.city || 'Bengaluru'})
+                Pickup Address: Registered Merchant Location ({delivery.address?.city || 'Bengaluru'})
               </p>
             </div>
           ))}
@@ -230,16 +255,16 @@ const AdminDeliveryDetailsPage = () => {
           </div>
 
           <p style={{ fontWeight: '700', fontSize: '0.95rem', color: '#1e293b', marginBottom: '0.35rem' }}>
-            {delivery.address.fullName || delivery.customer.name}
+            {delivery.address?.fullName || delivery.customer?.name || 'Customer'}
           </p>
           <div style={{ fontSize: '0.875rem', color: '#475569', lineHeight: '1.4' }}>
-            <div>{delivery.address.addressLine1 || delivery.address.line1 || 'N/A'}</div>
-            {delivery.address.addressLine2 && <div>{delivery.address.addressLine2}</div>}
+            <div>{delivery.address?.addressLine1 || delivery.address?.line1 || 'N/A'}</div>
+            {delivery.address?.addressLine2 && <div>{delivery.address.addressLine2}</div>}
             <div>
-              {delivery.address.city}, {delivery.address.state} {delivery.address.pincode || delivery.address.zipCode}
+              {delivery.address?.city || ''}, {delivery.address?.state || ''} {delivery.address?.pincode || delivery.address?.zipCode || ''}
             </div>
             <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#64748b' }}>
-              Phone: <strong>{delivery.address.phone || 'N/A'}</strong> | Type: <strong>{delivery.address.type || 'Home'}</strong>
+              Phone: <strong>{delivery.address?.phone || 'N/A'}</strong> | Type: <strong>{delivery.address?.type || 'Home'}</strong>
             </div>
           </div>
         </div>

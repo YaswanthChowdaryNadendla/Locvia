@@ -117,6 +117,27 @@ export const getProducts = async (params = {}) => {
 };
 
 /**
+ * Updates a product via admin console.
+ * PUT /api/admin/products/{id}
+ * @param {string|number} id
+ * @param {Object} data
+ * @returns {Promise<Object>}
+ */
+export const updateProduct = async (id, data) => {
+  return axiosClient.put(ENDPOINTS.ADMIN.PRODUCT_BY_ID(id), data);
+};
+
+/**
+ * Deactivates a product via admin console.
+ * DELETE /api/admin/products/{id}
+ * @param {string|number} id
+ * @returns {Promise<Object>}
+ */
+export const deleteProduct = async (id) => {
+  return axiosClient.delete(ENDPOINTS.ADMIN.PRODUCT_BY_ID(id));
+};
+
+/**
  * Fetches platform-wide inventory for administration.
  * GET /api/admin/inventory
  * @param {Object} [params]

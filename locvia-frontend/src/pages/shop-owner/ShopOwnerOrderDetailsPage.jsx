@@ -55,8 +55,28 @@ export default function ShopOwnerOrderDetailsPage() {
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
-    getOwnerShop().then(shop => setOwnerShop(shop)).catch(() => setOwnerShop(null));
-  }, []);
+    let isMounted = true;
+    getOwnerShop()
+      .then((shop) => {
+        if (isMounted) {
+          setOwnerShop(shop);
+          if (shop?.id && orderId) {
+            loadOrder(shop.id);
+          } else {
+            setLoading(false);
+          }
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setOwnerShop(null);
+          setLoading(false);
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [orderId]);
 
   const loadOrder = async (targetShopId) => {
     setLoading(true);
@@ -80,12 +100,6 @@ export default function ShopOwnerOrderDetailsPage() {
     }
   };
 
-  useEffect(() => {
-    if (ownerShop?.id && orderId) {
-      loadOrder(ownerShop.id);
-    }
-  }, [ownerShop?.id, orderId]);
-
   const showToast = (message, type = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
@@ -94,6 +108,10 @@ export default function ShopOwnerOrderDetailsPage() {
   // Execute Status Transition
   const executeStatusChange = async (newStatus, message) => {
     if (isUpdating) return;
+    if (!ownerShop?.id) {
+      showToast('No active shop found for this account.', 'error');
+      return;
+    }
     setIsUpdating(true);
     try {
       await updateOwnerOrderStatus(ownerShop.id, orderId, newStatus);

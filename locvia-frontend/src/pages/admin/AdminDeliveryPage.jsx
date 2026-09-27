@@ -1,7 +1,7 @@
 // src/pages/admin/AdminDeliveryPage.jsx
 // Main Admin Delivery Management Page (Module 34)
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Truck,
@@ -35,21 +35,51 @@ const AdminDeliveryPage = () => {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('NEWEST');
 
+  const [allPartners, setAllPartners] = useState([]);
+  const [allRecords, setAllRecords] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load data on mount
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoading(true);
+    Promise.all([
+      getAllDeliveryPartners(),
+      getAllDeliveryRecords(),
+    ])
+      .then(([partners, records]) => {
+        if (isMounted) {
+          setAllPartners(Array.isArray(partners) ? partners : []);
+          setAllRecords(Array.isArray(records) ? records : []);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load admin delivery data:', err);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Master derived data
-  const stats = useMemo(() => calculateDeliveryStats(), []);
-  const allPartners = useMemo(() => getAllDeliveryPartners(), []);
-  const allRecords = useMemo(() => getAllDeliveryRecords(), []);
+  const stats = useMemo(() => calculateDeliveryStats(allPartners, allRecords), [allPartners, allRecords]);
 
   // Filtered Delivery Partners
   const filteredPartners = useMemo(() => {
-    return allPartners.filter((p) => {
+    return (allPartners || []).filter((p) => {
       const q = partnerSearch.toLowerCase().trim();
       const matchesSearch =
         !q ||
-        p.name.toLowerCase().includes(q) ||
-        p.email.toLowerCase().includes(q) ||
-        (p.phone && p.phone.includes(q)) ||
-        p.id.toLowerCase().includes(q);
+        (p.name && p.name.toLowerCase().includes(q)) ||
+        (p.email && p.email.toLowerCase().includes(q)) ||
+        (p.phone && String(p.phone).includes(q)) ||
+        (p.id && String(p.id).toLowerCase().includes(q));
 
       const matchesFilter =
         partnerFilter === 'ALL' ||
@@ -63,37 +93,37 @@ const AdminDeliveryPage = () => {
 
   // Active Deliveries (ASSIGNED, PICKUP, PICKED_UP, OUT_FOR_DELIVERY)
   const activeDeliveries = useMemo(() => {
-    return allRecords.filter((r) =>
-      ['ASSIGNED', 'PICKUP', 'PICKED_UP', 'OUT_FOR_DELIVERY'].includes(r.orderStatus)
+    return (allRecords || []).filter((r) =>
+      ['ASSIGNED', 'PICKUP', 'PICKED_UP', 'OUT_FOR_DELIVERY'].includes((r.orderStatus || r.deliveryStatus || '').toUpperCase())
     );
   }, [allRecords]);
 
   // Unassigned Deliveries (READY_FOR_PICKUP, PREPARING, CONFIRMED, PLACED without partner)
   const unassignedDeliveries = useMemo(() => {
-    return allRecords.filter(
+    return (allRecords || []).filter(
       (r) =>
-        ['READY_FOR_PICKUP', 'PREPARING', 'CONFIRMED', 'PLACED'].includes(r.orderStatus) &&
+        ['READY_FOR_PICKUP', 'PREPARING', 'CONFIRMED', 'PLACED'].includes((r.orderStatus || '').toUpperCase()) &&
         !r.deliveryPartnerId
     );
   }, [allRecords]);
 
   // Filtered & Sorted Delivery Records
   const filteredRecords = useMemo(() => {
-    let result = allRecords.filter((r) => {
+    let result = (allRecords || []).filter((r) => {
       const q = deliverySearch.toLowerCase().trim();
       const partnerName = r.partner?.name || '';
-      const shopNames = r.shops.map((s) => s.name || '').join(' ');
+      const shopNames = Array.isArray(r.shops) ? r.shops.map((s) => s.name || '').join(' ') : '';
 
       const matchesSearch =
         !q ||
-        r.deliveryId.toLowerCase().includes(q) ||
-        r.orderId.toLowerCase().includes(q) ||
-        r.customer.name.toLowerCase().includes(q) ||
+        (r.deliveryId && r.deliveryId.toLowerCase().includes(q)) ||
+        (r.orderId && String(r.orderId).toLowerCase().includes(q)) ||
+        (r.customer?.name && r.customer.name.toLowerCase().includes(q)) ||
         partnerName.toLowerCase().includes(q) ||
         shopNames.toLowerCase().includes(q);
 
       const matchesStatus =
-        statusFilter === 'ALL' || r.orderStatus === statusFilter;
+        statusFilter === 'ALL' || (r.orderStatus || '').toUpperCase() === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
@@ -113,7 +143,7 @@ const AdminDeliveryPage = () => {
         return (b.partner?.name || 'Z').localeCompare(a.partner?.name || 'Z');
       }
       if (sortBy === 'STATUS') {
-        return a.orderStatus.localeCompare(b.orderStatus);
+        return (a.orderStatus || '').localeCompare(b.orderStatus || '');
       }
       return 0;
     });
@@ -293,11 +323,11 @@ const AdminDeliveryPage = () => {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
                       <Store size={16} style={{ color: '#6366f1' }} />
-                      <span><strong>Shop:</strong> {item.shops.map((s) => s.name).join(', ') || 'N/A'}</span>
+                      <span><strong>Shop:</strong> {Array.isArray(item.shops) ? item.shops.map((s) => s.name).join(', ') : 'N/A'}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <MapPin size={16} style={{ color: '#ef4444' }} />
-                      <span><strong>Customer:</strong> {item.customer.name} ({item.address.city || 'Bengaluru'})</span>
+                      <span><strong>Customer:</strong> {item.customer?.name || 'Customer'} ({item.address?.city || 'Bengaluru'})</span>
                     </div>
                   </div>
                 </div>
@@ -353,10 +383,10 @@ const AdminDeliveryPage = () => {
                   <span className="badge badge-warning">UNASSIGNED</span>
                 </div>
                 <p style={{ fontSize: '0.85rem', color: '#475569', margin: '0.25rem 0' }}>
-                  <strong>Pickup:</strong> {item.shops.map((s) => s.name).join(', ')}
+                  <strong>Pickup:</strong> {Array.isArray(item.shops) ? item.shops.map((s) => s.name).join(', ') : 'N/A'}
                 </p>
                 <p style={{ fontSize: '0.85rem', color: '#475569', margin: '0.25rem 0' }}>
-                  <strong>Destination:</strong> {item.customer.name} ({item.address.city || 'N/A'})
+                  <strong>Destination:</strong> {item.customer?.name || 'Customer'} ({item.address?.city || 'N/A'})
                 </p>
                 <div style={{ marginTop: '0.75rem', textAlign: 'right' }}>
                   <button
@@ -581,12 +611,12 @@ const AdminDeliveryPage = () => {
                     </td>
                     <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>
                       <div>
-                        <strong style={{ color: '#0f172a', display: 'block' }}>{r.customer.name}</strong>
-                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{r.address.city || 'N/A'}</span>
+                        <strong style={{ color: '#0f172a', display: 'block' }}>{r.customer?.name || 'Customer'}</strong>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{r.address?.city || 'N/A'}</span>
                       </div>
                     </td>
                     <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem', color: '#475569' }}>
-                      {r.shops.map((s) => s.name).join(', ') || 'N/A'}
+                      {Array.isArray(r.shops) ? r.shops.map((s) => s.name).join(', ') : 'N/A'}
                     </td>
                     <td style={{ padding: '0.75rem 1rem' }}>
                       {renderStatusBadge(r.orderStatus)}

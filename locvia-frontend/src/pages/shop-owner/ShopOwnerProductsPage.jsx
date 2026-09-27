@@ -66,15 +66,36 @@ export default function ShopOwnerProductsPage() {
 
   // Load owner's shop on mount
   useEffect(() => {
-    getOwnerShop().then(shop => setOwnerShop(shop)).catch(() => setOwnerShop(null));
+    let isMounted = true;
+    getOwnerShop()
+      .then((shop) => {
+        if (isMounted) {
+          setOwnerShop(shop);
+          if (shop?.id) {
+            loadProducts(shop.id);
+          } else {
+            setLoading(false);
+          }
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setOwnerShop(null);
+          setLoading(false);
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const loadProducts = async (targetShopId) => {
     const shopId = targetShopId || ownerShop?.id;
     if (shopId) {
       try {
+        setLoading(true);
         const data = await getOwnerProducts(shopId);
-        setProducts(data);
+        setProducts(Array.isArray(data) ? data : []);
       } catch {
         setProducts([]);
       } finally {
@@ -85,19 +106,13 @@ export default function ShopOwnerProductsPage() {
     }
   };
 
-  useEffect(() => {
-    if (ownerShop?.id) {
-      loadProducts(ownerShop.id);
-    }
-  }, [ownerShop?.id]);
-
   const showToast = (message, type = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3500);
   };
 
   // Filtered Products
-  const filteredProducts = products.filter((p) => {
+  const filteredProducts = (products || []).filter((p) => {
     const matchesSearch =
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (p.category && p.category.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -207,6 +222,10 @@ export default function ShopOwnerProductsPage() {
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
+    if (!ownerShop?.id) {
+      showToast('No active shop found for this account.', 'error');
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -253,6 +272,10 @@ export default function ShopOwnerProductsPage() {
   // Delete Handler
   const handleDeleteConfirm = async () => {
     if (!deletingProduct || isDeleting) return;
+    if (!ownerShop?.id) {
+      showToast('No active shop found for this account.', 'error');
+      return;
+    }
     setIsDeleting(true);
     try {
       await deleteOwnerProduct(ownerShop.id, deletingProduct.id);
@@ -267,10 +290,11 @@ export default function ShopOwnerProductsPage() {
   };
 
   // Stats calculation
-  const totalCount = products.length;
-  const activeCount = products.filter((p) => p.isAvailable !== false && (p.stock || 0) > 0).length;
-  const lowStockCount = products.filter((p) => (p.stock || 0) > 0 && (p.stock || 0) <= 10).length;
-  const outOfStockCount = products.filter((p) => (p.stock || 0) === 0).length;
+  const productList = Array.isArray(products) ? products : [];
+  const totalCount = productList.length;
+  const activeCount = productList.filter((p) => p.isAvailable !== false && (p.stock || 0) > 0).length;
+  const lowStockCount = productList.filter((p) => (p.stock || 0) > 0 && (p.stock || 0) <= 10).length;
+  const outOfStockCount = productList.filter((p) => (p.stock || 0) === 0).length;
 
   return (
     <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto', padding: '1rem', boxSizing: 'border-box' }}>
@@ -316,7 +340,7 @@ export default function ShopOwnerProductsPage() {
             Products
           </h1>
           <p style={{ color: '#6B7280', fontSize: '0.875rem', marginTop: '4px' }}>
-            Manage products available in <strong style={{ color: 'var(--color-primary)' }}>{ownerShop.name}</strong>
+            Manage products available in <strong style={{ color: 'var(--color-primary)' }}>{ownerShop?.name || 'Your Shop'}</strong>
           </p>
         </div>
 
@@ -865,7 +889,7 @@ export default function ShopOwnerProductsPage() {
                   <ProductImageUploader
                     existingImageUrl={formData.imageUrl}
                     existingPublicId={formData.imagePublicId}
-                    shopId={ownerShop.id}
+                    shopId={ownerShop?.id}
                     productId={editingProduct?.id || null}
                     onImageChange={handleImageChange}
                   />

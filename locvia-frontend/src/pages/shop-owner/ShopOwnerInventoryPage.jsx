@@ -50,7 +50,27 @@ export default function ShopOwnerInventoryPage() {
 
   // Load owner's shop on mount
   useEffect(() => {
-    getOwnerShop().then(shop => setOwnerShop(shop)).catch(() => setOwnerShop(null));
+    let isMounted = true;
+    getOwnerShop()
+      .then((shop) => {
+        if (isMounted) {
+          setOwnerShop(shop);
+          if (shop?.id) {
+            loadProducts(shop.id);
+          } else {
+            setLoading(false);
+          }
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setOwnerShop(null);
+          setLoading(false);
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const loadProducts = async (targetShopId) => {
@@ -58,10 +78,11 @@ export default function ShopOwnerInventoryPage() {
     if (shopId) {
       try {
         const data = await getOwnerProducts(shopId);
-        setProducts(data);
+        const safeData = Array.isArray(data) ? data : [];
+        setProducts(safeData);
         // Initialize edit buffer
         const buffer = {};
-        data.forEach((p) => {
+        safeData.forEach((p) => {
           buffer[p.id] = p.stock !== undefined ? p.stock : 0;
         });
         setStockEdits(buffer);
@@ -75,25 +96,20 @@ export default function ShopOwnerInventoryPage() {
     }
   };
 
-  useEffect(() => {
-    if (ownerShop?.id) {
-      loadProducts(ownerShop.id);
-    }
-  }, [ownerShop?.id]);
-
   const showToast = (message, type = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
   };
 
   // Metric summary counts
-  const totalProducts = products.length;
-  const inStockCount = products.filter((p) => (p.stock || 0) > 10).length;
-  const lowStockCount = products.filter((p) => (p.stock || 0) > 0 && (p.stock || 0) <= 10).length;
-  const outOfStockCount = products.filter((p) => (p.stock || 0) === 0).length;
+  const productList = Array.isArray(products) ? products : [];
+  const totalProducts = productList.length;
+  const inStockCount = productList.filter((p) => (p.stock || 0) > 10).length;
+  const lowStockCount = productList.filter((p) => (p.stock || 0) > 0 && (p.stock || 0) <= 10).length;
+  const outOfStockCount = productList.filter((p) => (p.stock || 0) === 0).length;
 
   // Categories list
-  const categories = ['ALL', ...new Set(products.map((p) => p.category).filter(Boolean))];
+  const categories = ['ALL', ...new Set(productList.map((p) => p.category).filter(Boolean))];
 
   // Inline Quick Stock Handlers
   const handleStockChange = (productId, newVal) => {
@@ -125,10 +141,14 @@ export default function ShopOwnerInventoryPage() {
   const handleSaveInlineStock = async (product) => {
     const newStock = stockEdits[product.id];
     if (newStock === undefined || savingId === product.id) return;
+    if (!ownerShop?.id) {
+      showToast('No active shop found for this account.', 'error');
+      return;
+    }
     setSavingId(product.id);
     try {
       await updateOwnerProduct(ownerShop.id, product.id, { stock: newStock });
-      loadProducts();
+      loadProducts(ownerShop.id);
       showToast(`Updated stock for "${product.name}" to ${newStock} units.`);
     } catch (err) {
       showToast(err.message || 'Failed to update stock.', 'error');
@@ -153,6 +173,10 @@ export default function ShopOwnerInventoryPage() {
 
   const handleApplyModalStock = async () => {
     if (!modalProduct || isApplying) return;
+    if (!ownerShop?.id) {
+      setModalError('No active shop found for this account.');
+      return;
+    }
     setModalError('');
 
     const val = parseInt(modalAmount, 10);
@@ -177,7 +201,7 @@ export default function ShopOwnerInventoryPage() {
     setIsApplying(true);
     try {
       await updateOwnerProduct(ownerShop.id, modalProduct.id, { stock: finalStock });
-      loadProducts();
+      loadProducts(ownerShop.id);
       showToast(`Updated "${modalProduct.name}" stock to ${finalStock} units.`);
       closeStockModal();
     } catch (err) {
@@ -188,7 +212,7 @@ export default function ShopOwnerInventoryPage() {
   };
 
   // Filtered Products List
-  const filteredProducts = products.filter((p) => {
+  const filteredProducts = (products || []).filter((p) => {
     const matchesSearch =
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (p.category && p.category.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -238,7 +262,7 @@ export default function ShopOwnerInventoryPage() {
           Inventory Management
         </h1>
         <p style={{ color: '#6B7280', fontSize: '0.875rem', marginTop: '4px' }}>
-          Monitor stock levels and manage item availability for <strong style={{ color: 'var(--color-primary)' }}>{ownerShop.name}</strong>
+          Monitor stock levels and manage item availability for <strong style={{ color: 'var(--color-primary)' }}>{ownerShop?.name || 'Your Shop'}</strong>
         </p>
       </div>
 

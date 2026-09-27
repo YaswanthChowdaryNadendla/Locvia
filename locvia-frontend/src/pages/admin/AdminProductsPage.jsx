@@ -55,10 +55,32 @@ const AdminProductsPage = () => {
 
   // Load data on mount
   useEffect(() => {
-    setProductsList(getAllProducts());
-    setShopsList(getAllShops());
-    setCategoriesList(getAllCategories());
-    setIsLoading(false);
+    let isMounted = true;
+    setIsLoading(true);
+    Promise.all([
+      getAllProducts(),
+      getAllShops(),
+      Promise.resolve(getAllCategories()),
+    ])
+      .then(([prods, shops, cats]) => {
+        if (isMounted) {
+          setProductsList(Array.isArray(prods) ? prods : []);
+          setShopsList(Array.isArray(shops) ? shops : []);
+          setCategoriesList(Array.isArray(cats) ? cats : []);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load admin products data:', err);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Clear toast after 3s
@@ -165,12 +187,14 @@ const AdminProductsPage = () => {
     setIsUpdatingStatus(true);
     try {
       const newStatus = productToToggleStatus.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-      const updated = updateProductStatus(productToToggleStatus.id, newStatus);
-      setProductsList(updated);
+      const updated = await updateProductStatus(productToToggleStatus.id, newStatus);
+      setProductsList(Array.isArray(updated) ? updated : []);
 
       const actionText = newStatus === 'ACTIVE' ? 'activated' : 'deactivated';
       setToastMessage(`Product "${productToToggleStatus.name}" ${actionText} successfully.`);
       setProductToToggleStatus(null);
+    } catch (err) {
+      setToastMessage(err.message || 'Failed to update product status.');
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -532,7 +556,7 @@ const AdminProductsPage = () => {
               }}
             >
               <option value="ALL">All Categories</option>
-              {categoriesList.map((cat) => (
+              {(categoriesList || []).map((cat) => (
                 <option key={cat.id} value={cat.name}>
                   {cat.name}
                 </option>
@@ -555,7 +579,7 @@ const AdminProductsPage = () => {
             }}
           >
             <option value="ALL">All Shops</option>
-            {shopsList.map((shop) => (
+            {(shopsList || []).map((shop) => (
               <option key={shop.id} value={shop.id}>
                 {shop.name}
               </option>

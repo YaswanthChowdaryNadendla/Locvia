@@ -81,7 +81,7 @@ export const ENDPOINTS = {
     SET_DEFAULT: (id) => `/addresses/${id}/default`,
   },
 
-  // Orders & Lifecycle (OrderController.java)
+  // Orders & Lifecycle (OrderController.java & ShopOrderController.java)
   ORDERS: {
     BASE: '/orders',
     DETAIL: (id) => `/orders/${id}`,
@@ -89,6 +89,9 @@ export const ENDPOINTS = {
     CANCEL: (id) => `/orders/${id}/cancel`,
     DELIVERY: (orderId) => `/orders/${orderId}/delivery`,
     PAYMENT: (orderId) => `/orders/${orderId}/payment`,
+    BY_SHOP: (shopId) => `/shops/${shopId}/orders`,
+    SHOP_ORDER_DETAIL: (shopId, orderId) => `/shops/${shopId}/orders/${orderId}`,
+    SHOP_ORDER_STATUS: (shopId, orderId) => `/shops/${shopId}/orders/${orderId}/status`,
   },
 
   // Delivery Partner Operations (DeliveryController.java)
