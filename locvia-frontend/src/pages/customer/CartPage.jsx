@@ -264,7 +264,7 @@ const CartPage = () => {
                           {/* Image */}
                           <div className="cart-item-image-box">
                             <img
-                              src={normalizeImageUrl(product.image, 'product')}
+                              src={normalizeImageUrl(product.imageUrl || product.image, 'product')}
                               alt={product.name}
                               onError={(e) => handleImageError(e, 'product')}
                               className="cart-item-img"

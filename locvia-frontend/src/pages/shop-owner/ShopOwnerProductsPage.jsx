@@ -147,7 +147,7 @@ export default function ShopOwnerProductsPage() {
       selectedCategory === 'All' || productCategory.toLowerCase() === selectedCategory.toLowerCase();
 
     let matchesStatus = true;
-    const stockVal = p.stock !== undefined ? p.stock : 0;
+    const stockVal = p.stockQuantity !== undefined ? p.stockQuantity : (p.stock !== undefined ? p.stock : 0);
 
     if (statusFilter === 'ACTIVE') matchesStatus = p.isAvailable !== false && stockVal > 0;
     if (statusFilter === 'INACTIVE') matchesStatus = p.isAvailable === false || stockVal === 0;
@@ -241,7 +241,7 @@ export default function ShopOwnerProductsPage() {
       price: product.price !== undefined ? product.price : '',
       mrp: product.mrp || product.originalPrice || product.price || '',
       unit: product.unit || '1 kg',
-      stock: product.stock !== undefined ? product.stock : 25,
+      stock: product.stockQuantity !== undefined ? product.stockQuantity : (product.stock !== undefined ? product.stock : 25),
       description: product.description || '',
       imageUrl: product.imageUrl || product.image || '',
       imagePublicId: product.imagePublicId || '',
@@ -278,6 +278,7 @@ export default function ShopOwnerProductsPage() {
       const price = Number(formData.price);
       const mrp = Number(formData.mrp || formData.price);
       const discount = mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
+      const stockQuantity = Number(formData.stock !== '' && !isNaN(Number(formData.stock)) ? formData.stock : 0);
 
       const payload = {
         name: formData.name.trim(),
@@ -289,11 +290,12 @@ export default function ShopOwnerProductsPage() {
         originalPrice: mrp,
         discount,
         unit: formData.unit,
-        stock: Number(formData.stock),
+        stock: stockQuantity,
+        stockQuantity: stockQuantity,
         imageUrl: formData.imageUrl,
         image: formData.imageUrl,
         imagePublicId: formData.imagePublicId || `locvia/products/${ownerShop.id}/${Date.now()}`,
-        isAvailable: formData.isAvailable && Number(formData.stock) > 0,
+        isAvailable: formData.isAvailable && stockQuantity > 0,
       };
 
       if (editingProduct) {
@@ -337,9 +339,10 @@ export default function ShopOwnerProductsPage() {
   // Stats calculation
   const productList = Array.isArray(products) ? products : [];
   const totalCount = productList.length;
-  const activeCount = productList.filter((p) => p.isAvailable !== false && (p.stock || 0) > 0).length;
-  const lowStockCount = productList.filter((p) => (p.stock || 0) > 0 && (p.stock || 0) <= 10).length;
-  const outOfStockCount = productList.filter((p) => (p.stock || 0) === 0).length;
+  const getProductStock = (p) => p.stockQuantity !== undefined ? p.stockQuantity : (p.stock || 0);
+  const activeCount = productList.filter((p) => p.isAvailable !== false && getProductStock(p) > 0).length;
+  const lowStockCount = productList.filter((p) => getProductStock(p) > 0 && getProductStock(p) <= 10).length;
+  const outOfStockCount = productList.filter((p) => getProductStock(p) === 0).length;
 
   return (
     <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto', padding: '1rem', boxSizing: 'border-box' }}>
@@ -635,8 +638,9 @@ export default function ShopOwnerProductsPage() {
               </thead>
               <tbody>
                 {filteredProducts.map((product) => {
-                  const isOut = (product.stock || 0) === 0;
-                  const isLow = (product.stock || 0) > 0 && (product.stock || 0) <= 10;
+                  const effectiveStock = product.stockQuantity !== undefined ? product.stockQuantity : (product.stock !== undefined ? product.stock : 0);
+                  const isOut = effectiveStock === 0;
+                  const isLow = effectiveStock > 0 && effectiveStock <= 10;
                   const mrpVal = product.mrp || product.originalPrice || product.price;
 
                   return (
@@ -730,7 +734,7 @@ export default function ShopOwnerProductsPage() {
                             fontSize: '0.9rem',
                           }}
                         >
-                          {product.stock !== undefined ? product.stock : 0}
+                          {effectiveStock}
                         </span>
                       </td>
 

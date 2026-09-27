@@ -1,6 +1,9 @@
 package com.locvia.dto;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -30,6 +33,42 @@ public record UpdateProductRequest(
         @Size(max = 500, message = "Image URL must not exceed 500 characters")
         String imageUrl,
 
-        Boolean active
+        Boolean active,
+
+        @Min(value = 0, message = "Stock quantity cannot be negative")
+        Integer stockQuantity,
+
+        Integer stock
 ) {
+    @JsonCreator
+    public UpdateProductRequest(
+            @JsonProperty("name") String name,
+            @JsonProperty("description") String description,
+            @JsonProperty("price") BigDecimal price,
+            @JsonProperty("discountPrice") BigDecimal discountPrice,
+            @JsonProperty("unit") String unit,
+            @JsonProperty("categoryId") Long categoryId,
+            @JsonProperty("imageUrl") String imageUrl,
+            @JsonProperty("active") Boolean active,
+            @JsonProperty("stockQuantity") Integer stockQuantity,
+            @JsonProperty("stock") Integer stock) {
+        this.name = name;
+        this.description = description;
+        this.price = price;
+        this.discountPrice = discountPrice;
+        this.unit = unit;
+        this.categoryId = categoryId;
+        this.imageUrl = imageUrl;
+        this.active = active;
+        this.stockQuantity = stockQuantity != null ? stockQuantity : stock;
+        this.stock = this.stockQuantity;
+    }
+
+    public UpdateProductRequest(String name, String description, BigDecimal price, BigDecimal discountPrice, String unit, Long categoryId, String imageUrl, Boolean active) {
+        this(name, description, price, discountPrice, unit, categoryId, imageUrl, active, null, null);
+    }
+
+    public Integer resolvedStock() {
+        return stockQuantity != null ? stockQuantity : stock;
+    }
 }

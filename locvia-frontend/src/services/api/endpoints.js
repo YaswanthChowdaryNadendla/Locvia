@@ -52,6 +52,7 @@ export const ENDPOINTS = {
     BY_SHOP: (shopId) => `/shops/${shopId}/products`,
     CREATE_FOR_SHOP: (shopId) => `/shops/${shopId}/products`,
     IMAGE: (id) => `/products/${id}/image`,
+    UPLOAD_IMAGE: '/products/upload-image',
     UPDATE: (id) => `/products/${id}`,
     DELETE: (id) => `/products/${id}`,
   },

@@ -47,6 +47,9 @@ public class Product {
     @JoinColumn(name = "category_id")
     private Category category;
 
+    @Column(name = "stock", nullable = false)
+    private Integer stock = 0;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -57,6 +60,10 @@ public class Product {
     }
 
     public Product(String name, String description, BigDecimal price, BigDecimal discountPrice, String imageUrl, String unit, Shop shop, Category category) {
+        this(name, description, price, discountPrice, imageUrl, unit, shop, category, 0);
+    }
+
+    public Product(String name, String description, BigDecimal price, BigDecimal discountPrice, String imageUrl, String unit, Shop shop, Category category, Integer stock) {
         this.name = name;
         this.description = description;
         this.price = price;
@@ -65,6 +72,7 @@ public class Product {
         this.unit = unit;
         this.shop = shop;
         this.category = category;
+        this.stock = stock != null ? stock : 0;
     }
 
     @PrePersist
@@ -72,6 +80,7 @@ public class Product {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
         if (this.active == null) this.active = true;
+        if (this.stock == null) this.stock = 0;
     }
 
     @PreUpdate
@@ -181,5 +190,21 @@ public class Product {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Integer getStock() {
+        return stock != null ? stock : 0;
+    }
+
+    public void setStock(Integer stock) {
+        this.stock = stock != null ? stock : 0;
+    }
+
+    public Integer getStockQuantity() {
+        return getStock();
+    }
+
+    public void setStockQuantity(Integer stockQuantity) {
+        setStock(stockQuantity);
     }
 }

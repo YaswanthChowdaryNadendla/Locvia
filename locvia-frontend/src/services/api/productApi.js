@@ -127,6 +127,22 @@ export const uploadProductImage = async (productId, file) => {
   });
 };
 
+/**
+ * Uploads a product image prior to or independent of product entity creation.
+ * POST /api/products/upload-image (multipart/form-data)
+ * @param {File|Blob} file
+ * @returns {Promise<Object>} Object with { secure_url, url, imageUrl, public_id }
+ */
+export const uploadImage = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return axiosClient.post(ENDPOINTS.PRODUCTS.UPLOAD_IMAGE, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+};
+
 export default {
   getProducts,
   getProductById,
@@ -138,4 +154,5 @@ export default {
   updateProduct,
   deleteProduct,
   uploadProductImage,
+  uploadImage,
 };

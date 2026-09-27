@@ -130,4 +130,26 @@ public class ProductController {
         ProductResponse response = productService.uploadProductImage(id, file, principal.getName());
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Standalone product image upload to Cloudinary.
+     * POST /api/products/upload-image
+     *
+     * @param file      multipart image file
+     * @param principal authenticated user principal
+     * @return map with secure_url, url, imageUrl, and public_id
+     */
+    @PostMapping("/upload-image")
+    @PreAuthorize("hasAnyRole('SHOP_OWNER', 'ADMIN')")
+    public ResponseEntity<Map<String, String>> uploadImage(
+            @RequestParam("file") MultipartFile file,
+            Principal principal) {
+        var result = productService.uploadImage(file);
+        return ResponseEntity.ok(Map.of(
+                "secure_url", result.secureUrl(),
+                "url", result.secureUrl(),
+                "imageUrl", result.secureUrl(),
+                "public_id", result.publicId()
+        ));
+    }
 }

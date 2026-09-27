@@ -55,7 +55,9 @@ export const getAllProducts = async () => {
     const discount = p.discount || (mrp > price && mrp > 0 ? Math.round(((mrp - price) / mrp) * 100) : 0);
 
     // 4. Resolve Stock & Status
-    const stock = typeof p.stock === 'number' ? p.stock : 25;
+    const stock = typeof p.stockQuantity === 'number'
+      ? p.stockQuantity
+      : (typeof p.stock === 'number' ? p.stock : 0);
     const isAvailable = p.active !== undefined ? Boolean(p.active) : (p.isAvailable !== false);
     const status = p.active !== undefined
       ? (p.active ? 'ACTIVE' : 'INACTIVE')
@@ -74,9 +76,11 @@ export const getAllProducts = async () => {
       category: categoryName,
       categoryId: p.categoryId || categoryObj?.id || null,
       image: p.imageUrl || p.image || null,
+      imageUrl: p.imageUrl || p.image || null,
       rating: typeof p.rating === 'number' ? p.rating : null,
       reviewCount: p.reviewCount || 0,
       stock,
+      stockQuantity: stock,
       isAvailable,
       status,
       createdAt: p.createdAt || '2024-01-01T00:00:00Z',

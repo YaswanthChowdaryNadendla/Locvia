@@ -109,6 +109,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/products/{id:[0-9]+}").hasAnyRole("SHOP_OWNER", "ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/products/{id:[0-9]+}").hasAnyRole("SHOP_OWNER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/products/{id:[0-9]+}/image").hasAnyRole("SHOP_OWNER", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/products/upload-image").hasAnyRole("SHOP_OWNER", "ADMIN")
                         // Product-scoped inventory management
                         .requestMatchers("/api/products/{productId:[0-9]+}/inventory/manage").hasAnyRole("SHOP_OWNER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/products/{productId:[0-9]+}/inventory").hasAnyRole("SHOP_OWNER", "ADMIN")

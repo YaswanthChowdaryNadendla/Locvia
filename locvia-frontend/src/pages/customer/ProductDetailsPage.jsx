@@ -149,7 +149,10 @@ const ProductDetailsPage = () => {
   }, [loadProductData]);
 
   // Handle quantity changes
-  const stockLimit = product?.stock !== undefined ? product.stock : (product?.isAvailable ? 20 : 0);
+  const effectiveStock = product?.stockQuantity !== undefined
+    ? product.stockQuantity
+    : (product?.stock !== undefined ? product.stock : (product?.isAvailable ? 20 : 0));
+  const stockLimit = effectiveStock;
 
   const handleIncrement = () => {
     if (quantity < stockLimit) {
@@ -308,8 +311,9 @@ const ProductDetailsPage = () => {
     );
   }
 
-  const images = product.images && product.images.length > 0 ? product.images : [product.image];
-  const isAvailable = product.isAvailable !== false && (product.stock === undefined || product.stock > 0);
+  const primaryImage = product.imageUrl || product.image;
+  const images = product.images && product.images.length > 0 ? product.images : (primaryImage ? [primaryImage] : []);
+  const isAvailable = product.isAvailable !== false && (effectiveStock === null || effectiveStock === undefined || effectiveStock > 0);
 
   return (
     <div className="pdp-container animate-fade-in">
@@ -355,7 +359,7 @@ const ProductDetailsPage = () => {
         <div className="pdp-gallery-wrap">
           <div className="pdp-main-image-card">
             <img
-              src={normalizeImageUrl(images[activeImageIndex] || product.image, 'product')}
+              src={normalizeImageUrl(images[activeImageIndex] || primaryImage, 'product')}
               alt={product.name}
               onError={(e) => handleImageError(e, 'product')}
               className="pdp-main-img"

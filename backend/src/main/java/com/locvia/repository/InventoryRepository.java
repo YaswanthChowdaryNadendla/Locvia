@@ -92,4 +92,13 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
      */
     @Query("SELECT i FROM Inventory i WHERE (:shopId IS NULL OR i.product.shop.id = :shopId)")
     List<Inventory> findAllWithFilters(@Param("shopId") Long shopId);
+
+    /**
+     * Finds inventory quantities for a list of product IDs.
+     *
+     * @param productIds list of product IDs
+     * @return list of [productId, quantity] arrays
+     */
+    @Query("SELECT i.product.id, i.quantity FROM Inventory i WHERE i.product.id IN :productIds")
+    List<Object[]> findStockByProductIds(@Param("productIds") List<Long> productIds);
 }

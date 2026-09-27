@@ -95,6 +95,8 @@ public class InventoryService {
 
         Inventory inventory = new Inventory(product, request.quantity(), request.lowStockThreshold());
         Inventory saved = inventoryRepository.save(inventory);
+        product.setStock(request.quantity());
+        productRepository.save(product);
         return InventoryResponse.fromEntity(saved);
     }
 
@@ -145,6 +147,8 @@ public class InventoryService {
         inventory.setAvailable(request.quantity() > 0);
 
         Inventory updated = inventoryRepository.save(inventory);
+        product.setStock(request.quantity());
+        productRepository.save(product);
         return InventoryResponse.fromEntity(updated);
     }
 
@@ -172,6 +176,8 @@ public class InventoryService {
         inventory.setAvailable(request.quantity() > 0);
 
         Inventory updated = inventoryRepository.save(inventory);
+        product.setStock(request.quantity());
+        productRepository.save(product);
         return InventoryResponse.fromEntity(updated);
     }
 
@@ -310,6 +316,8 @@ public class InventoryService {
 
         Inventory inventory = new Inventory(product, request.quantity(), request.lowStockThreshold());
         Inventory saved = inventoryRepository.save(inventory);
+        product.setStock(request.quantity());
+        productRepository.save(product);
         return InventoryResponse.fromEntity(saved);
     }
 
@@ -330,6 +338,10 @@ public class InventoryService {
         inventory.setAvailable(request.quantity() > 0);
 
         Inventory updated = inventoryRepository.save(inventory);
+        if (inventory.getProduct() != null) {
+            inventory.getProduct().setStock(request.quantity());
+            productRepository.save(inventory.getProduct());
+        }
         return InventoryResponse.fromEntity(updated);
     }
 
@@ -349,6 +361,10 @@ public class InventoryService {
         inventory.setAvailable(request.quantity() > 0);
 
         Inventory updated = inventoryRepository.save(inventory);
+        if (inventory.getProduct() != null) {
+            inventory.getProduct().setStock(request.quantity());
+            productRepository.save(inventory.getProduct());
+        }
         return InventoryResponse.fromEntity(updated);
     }
 

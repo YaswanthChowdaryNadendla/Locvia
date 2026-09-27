@@ -39,11 +39,17 @@ const ProductCard = ({
     discount,
     unit,
     image,
+    imageUrl,
     rating,
     reviewCount,
     isAvailable = true,
     shopId,
+    stock,
+    stockQuantity,
   } = product;
+
+  const effectiveStock = stockQuantity !== undefined ? stockQuantity : (stock !== undefined ? stock : null);
+  const isActuallyAvailable = isAvailable && (effectiveStock === null || effectiveStock > 0);
 
   // Determine current quantity in cart
   const quantity = propQuantity !== undefined 
@@ -63,6 +69,7 @@ const ProductCard = ({
 
   const handleAdd = (e) => {
     e.stopPropagation();
+    if (!isActuallyAvailable) return;
     if (propOnAdd) {
       propOnAdd(product);
     } else if (cart) {
@@ -72,6 +79,7 @@ const ProductCard = ({
 
   const handleIncrement = (e) => {
     e.stopPropagation();
+    if (effectiveStock !== null && quantity >= effectiveStock) return;
     if (propOnIncrement) {
       propOnIncrement(id);
     } else if (cart) {
@@ -99,7 +107,7 @@ const ProductCard = ({
       {/* Product Image Box */}
       <div className="lv-product-card-media">
         <img
-          src={normalizeImageUrl(image, 'product')}
+          src={normalizeImageUrl(imageUrl || image || product.imageUrl || product.image, 'product')}
           alt={name}
           onError={(e) => handleImageError(e, 'product')}
           className="lv-product-img"
@@ -173,7 +181,7 @@ const ProductCard = ({
           </div>
 
           {/* Add Button / Stepper */}
-          {isAvailable ? (
+          {isActuallyAvailable ? (
             <div>
               {quantity === 0 ? (
                 <button
@@ -210,7 +218,7 @@ const ProductCard = ({
               disabled
               className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
             >
-              Unavailable
+              {effectiveStock === 0 ? 'Out of Stock' : 'Unavailable'}
             </button>
           )}
         </div>

@@ -1,8 +1,6 @@
-// src/components/shop-owner/ProductImageUploader.jsx
-// Reusable Cloudinary-ready Product Image Uploader component for Module 21
-
 import { useState, useEffect } from 'react';
 import { Upload, X, RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
+import { uploadImage } from '../../services/api/productApi';
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -49,37 +47,36 @@ export default function ProductImageUploader({
     return true;
   };
 
-  const handleFileSelect = (file) => {
+  const handleFileSelect = async (file) => {
     if (!validateFile(file)) return;
 
-    // Generate local preview URL
+    // Generate immediate local preview URL
     const objectUrl = URL.createObjectURL(file);
     setPreviewUrl(objectUrl);
     setUploadState('uploading');
-    setUploadProgress(20);
+    setUploadProgress(35);
 
-    // Simulate Cloudinary-ready async upload pipeline
-    const timer1 = setTimeout(() => setUploadProgress(60), 200);
-    const timer2 = setTimeout(() => {
+    try {
+      const res = await uploadImage(file);
+      const secureUrl = res?.secure_url || res?.url || res?.imageUrl || objectUrl;
+      const uploadedPublicId = res?.public_id || publicId || `locvia/products/${shopId}/${productId || Date.now()}`;
+
       setUploadProgress(100);
       setUploadState('success');
+      setPreviewUrl(secureUrl);
+      setPublicId(uploadedPublicId);
 
-      const generatedPublicId = publicId || `locvia/products/${shopId}/${productId || Date.now()}`;
-      setPublicId(generatedPublicId);
-
-      // Notify parent component with file & preview info
       onImageChange({
         file,
-        previewUrl: objectUrl,
-        imageUrl: objectUrl,
-        imagePublicId: generatedPublicId,
+        previewUrl: secureUrl,
+        imageUrl: secureUrl,
+        imagePublicId: uploadedPublicId,
       });
-    }, 450);
-
-    return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-    };
+    } catch (err) {
+      console.error('Image upload failed:', err);
+      setUploadState('error');
+      setErrorMessage(err?.response?.data?.message || err?.message || 'Failed to upload image. Please try again.');
+    }
   };
 
   const handleInputChange = (e) => {

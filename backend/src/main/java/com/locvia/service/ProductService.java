@@ -21,7 +21,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Core business service managing product operations:
@@ -69,10 +71,8 @@ public class ProductService {
     @Transactional(readOnly = true)
     public List<ProductResponse> getPublicProducts(Long shopId, Long categoryId, String search) {
         String trimmedSearch = (search != null && !search.isBlank()) ? search.trim() : null;
-        return productRepository.findActiveProductsWithFilters(shopId, categoryId, trimmedSearch)
-                .stream()
-                .map(ProductResponse::fromEntity)
-                .toList();
+        List<Product> products = productRepository.findActiveProductsWithFilters(shopId, categoryId, trimmedSearch);
+        return mapProductsWithStock(products);
     }
 
     /**
@@ -84,9 +84,9 @@ public class ProductService {
      */
     @Transactional(readOnly = true)
     public ProductResponse getPublicProductById(Long id) {
-        return productRepository.findByIdAndActiveTrue(id)
-                .map(ProductResponse::fromEntity)
+        Product product = productRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+        return toProductResponseWithStock(product);
     }
 
     // ==========================================
@@ -129,6 +129,8 @@ public class ProductService {
             throw new IllegalArgumentException("Cannot associate product with an inactive category");
         }
 
+        int initialStock = request.resolvedStock();
+
         Product product = new Product();
         product.setName(request.name().trim());
         if (request.description() != null) {
@@ -143,12 +145,17 @@ public class ProductService {
         product.setShop(shop);
         product.setCategory(category);
         product.setActive(true);
+        product.setStock(initialStock);
 
         Product saved = productRepository.save(product);
-        if (!inventoryRepository.existsByProductId(saved.getId())) {
-            inventoryRepository.save(new Inventory(saved, 25, 5));
-        }
-        return ProductResponse.fromEntity(saved);
+
+        Inventory inventory = inventoryRepository.findByProductId(saved.getId())
+                .orElseGet(() -> new Inventory(saved, initialStock, 5));
+        inventory.setQuantity(initialStock);
+        inventory.setAvailable(initialStock > 0);
+        inventoryRepository.save(inventory);
+
+        return ProductResponse.fromEntity(saved, initialStock);
     }
 
     /**
@@ -169,10 +176,8 @@ public class ProductService {
             throw new AccessDeniedException("Access denied: You do not have permission to view products for another owner's shop");
         }
 
-        return productRepository.findByShopId(shopId)
-                .stream()
-                .map(ProductResponse::fromEntity)
-                .toList();
+        List<Product> products = productRepository.findByShopId(shopId);
+        return mapProductsWithStock(products);
     }
 
     /**
@@ -193,7 +198,7 @@ public class ProductService {
             throw new AccessDeniedException("Access denied: You do not have permission to manage this product");
         }
 
-        return ProductResponse.fromEntity(product);
+        return toProductResponseWithStock(product);
     }
 
     /**
@@ -246,8 +251,18 @@ public class ProductService {
             product.setActive(request.active());
         }
 
+        if (request.resolvedStock() != null) {
+            int updatedStock = request.resolvedStock();
+            product.setStock(updatedStock);
+            Inventory inventory = inventoryRepository.findByProductId(product.getId())
+                    .orElseGet(() -> new Inventory(product, updatedStock, 5));
+            inventory.setQuantity(updatedStock);
+            inventory.setAvailable(updatedStock > 0);
+            inventoryRepository.save(inventory);
+        }
+
         Product updated = productRepository.save(product);
-        return ProductResponse.fromEntity(updated);
+        return toProductResponseWithStock(updated);
     }
 
     /**
@@ -306,7 +321,17 @@ public class ProductService {
             cloudinaryService.deleteImage(oldPublicId);
         }
 
-        return ProductResponse.fromEntity(saved);
+        return toProductResponseWithStock(saved);
+    }
+
+    /**
+     * Standalone image upload to Cloudinary for new products or general media management.
+     *
+     * @param file multipart image file
+     * @return CloudinaryUploadResult with secureUrl and publicId
+     */
+    public CloudinaryService.CloudinaryUploadResult uploadImage(MultipartFile file) {
+        return cloudinaryService.uploadProductImage(file);
     }
 
     // ==========================================
@@ -324,10 +349,8 @@ public class ProductService {
     @Transactional(readOnly = true)
     public List<ProductResponse> getAllProductsForAdmin(Long shopId, Long categoryId, String search) {
         String trimmedSearch = (search != null && !search.isBlank()) ? search.trim() : null;
-        return productRepository.findAllProductsWithFilters(shopId, categoryId, trimmedSearch)
-                .stream()
-                .map(ProductResponse::fromEntity)
-                .toList();
+        List<Product> products = productRepository.findAllProductsWithFilters(shopId, categoryId, trimmedSearch);
+        return mapProductsWithStock(products);
     }
 
     /**
@@ -338,9 +361,9 @@ public class ProductService {
      */
     @Transactional(readOnly = true)
     public ProductResponse getProductByIdForAdmin(Long id) {
-        return productRepository.findById(id)
-                .map(ProductResponse::fromEntity)
+        Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+        return toProductResponseWithStock(product);
     }
 
     /**
@@ -357,6 +380,8 @@ public class ProductService {
         Category category = categoryRepository.findById(request.categoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + request.categoryId()));
 
+        int initialStock = request.resolvedStock();
+
         Product product = new Product();
         product.setName(request.name().trim());
         if (request.description() != null) {
@@ -371,12 +396,17 @@ public class ProductService {
         product.setShop(shop);
         product.setCategory(category);
         product.setActive(true);
+        product.setStock(initialStock);
 
         Product saved = productRepository.save(product);
-        if (!inventoryRepository.existsByProductId(saved.getId())) {
-            inventoryRepository.save(new Inventory(saved, 25, 5));
-        }
-        return ProductResponse.fromEntity(saved);
+
+        Inventory inventory = inventoryRepository.findByProductId(saved.getId())
+                .orElseGet(() -> new Inventory(saved, initialStock, 5));
+        inventory.setQuantity(initialStock);
+        inventory.setAvailable(initialStock > 0);
+        inventoryRepository.save(inventory);
+
+        return ProductResponse.fromEntity(saved, initialStock);
     }
 
     /**
@@ -419,8 +449,18 @@ public class ProductService {
             product.setActive(request.active());
         }
 
+        if (request.resolvedStock() != null) {
+            int updatedStock = request.resolvedStock();
+            product.setStock(updatedStock);
+            Inventory inventory = inventoryRepository.findByProductId(product.getId())
+                    .orElseGet(() -> new Inventory(product, updatedStock, 5));
+            inventory.setQuantity(updatedStock);
+            inventory.setAvailable(updatedStock > 0);
+            inventoryRepository.save(inventory);
+        }
+
         Product updated = productRepository.save(product);
-        return ProductResponse.fromEntity(updated);
+        return toProductResponseWithStock(updated);
     }
 
     /**
@@ -434,6 +474,50 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
         product.setActive(false);
         productRepository.save(product);
+    }
+
+    // ==========================================
+    // Internal Helper Methods
+    // ==========================================
+
+    private List<ProductResponse> mapProductsWithStock(List<Product> products) {
+        if (products == null || products.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> productIds = products.stream().map(Product::getId).toList();
+        Map<Long, Integer> stockMap = new HashMap<>();
+
+        try {
+            List<Object[]> rows = inventoryRepository.findStockByProductIds(productIds);
+            if (rows != null) {
+                for (Object[] row : rows) {
+                    if (row != null && row.length >= 2 && row[0] instanceof Long pId && row[1] instanceof Integer qty) {
+                        stockMap.put(pId, qty);
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // fallback to product entity stock
+        }
+
+        return products.stream()
+                .map(p -> {
+                    Integer invStock = stockMap.get(p.getId());
+                    Integer effectiveStock = invStock != null ? invStock : (p.getStock() != null ? p.getStock() : 0);
+                    return ProductResponse.fromEntity(p, effectiveStock);
+                })
+                .toList();
+    }
+
+    private ProductResponse toProductResponseWithStock(Product product) {
+        if (product == null) {
+            return null;
+        }
+        Integer invStock = inventoryRepository.findByProductId(product.getId())
+                .map(Inventory::getQuantity)
+                .orElse(product.getStock() != null ? product.getStock() : 0);
+        return ProductResponse.fromEntity(product, invStock);
     }
 
     private User findUserByEmail(String email) {

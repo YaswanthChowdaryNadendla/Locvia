@@ -104,9 +104,10 @@ export default function ShopOwnerInventoryPage() {
   // Metric summary counts
   const productList = Array.isArray(products) ? products : [];
   const totalProducts = productList.length;
-  const inStockCount = productList.filter((p) => (p.stock || 0) > 10).length;
-  const lowStockCount = productList.filter((p) => (p.stock || 0) > 0 && (p.stock || 0) <= 10).length;
-  const outOfStockCount = productList.filter((p) => (p.stock || 0) === 0).length;
+  const getProductStock = (p) => p.stockQuantity !== undefined ? p.stockQuantity : (p.stock || 0);
+  const inStockCount = productList.filter((p) => getProductStock(p) > 10).length;
+  const lowStockCount = productList.filter((p) => getProductStock(p) > 0 && getProductStock(p) <= 10).length;
+  const outOfStockCount = productList.filter((p) => getProductStock(p) === 0).length;
 
   // Categories list
   const categories = ['ALL', ...new Set(productList.map((p) => p.category).filter(Boolean))];
@@ -147,7 +148,7 @@ export default function ShopOwnerInventoryPage() {
     }
     setSavingId(product.id);
     try {
-      await updateOwnerProduct(ownerShop.id, product.id, { stock: newStock });
+      await updateOwnerProduct(ownerShop.id, product.id, { stock: newStock, stockQuantity: newStock });
       loadProducts(ownerShop.id);
       showToast(`Updated stock for "${product.name}" to ${newStock} units.`);
     } catch (err) {
@@ -161,7 +162,8 @@ export default function ShopOwnerInventoryPage() {
   const openStockModal = (product) => {
     setModalProduct(product);
     setModalMode('SET');
-    setModalAmount(String(product.stock || 0));
+    const initStock = product.stockQuantity !== undefined ? product.stockQuantity : (product.stock || 0);
+    setModalAmount(String(initStock));
     setModalError('');
   };
 
@@ -185,7 +187,7 @@ export default function ShopOwnerInventoryPage() {
       return;
     }
 
-    let finalStock = modalProduct.stock || 0;
+    let finalStock = modalProduct.stockQuantity !== undefined ? modalProduct.stockQuantity : (modalProduct.stock || 0);
     if (modalMode === 'SET') {
       finalStock = val;
     } else if (modalMode === 'ADD') {
@@ -200,7 +202,7 @@ export default function ShopOwnerInventoryPage() {
 
     setIsApplying(true);
     try {
-      await updateOwnerProduct(ownerShop.id, modalProduct.id, { stock: finalStock });
+      await updateOwnerProduct(ownerShop.id, modalProduct.id, { stock: finalStock, stockQuantity: finalStock });
       loadProducts(ownerShop.id);
       showToast(`Updated "${modalProduct.name}" stock to ${finalStock} units.`);
       closeStockModal();
@@ -219,7 +221,9 @@ export default function ShopOwnerInventoryPage() {
 
     const matchesCategory = selectedCategory === 'ALL' || p.category === selectedCategory;
 
-    const currentStock = stockEdits[p.id] !== undefined ? stockEdits[p.id] : p.stock || 0;
+    const currentStock = stockEdits[p.id] !== undefined
+      ? stockEdits[p.id]
+      : (p.stockQuantity !== undefined ? p.stockQuantity : (p.stock || 0));
 
     let matchesFilter = true;
     if (stockFilter === 'IN_STOCK') matchesFilter = currentStock > 10;
@@ -533,7 +537,7 @@ export default function ShopOwnerInventoryPage() {
                       <td style={tdStyle}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <img
-                            src={normalizeImageUrl(product.image, 'product')}
+                            src={normalizeImageUrl(product.imageUrl || product.image, 'product')}
                             alt={product.name}
                             onError={(e) => handleImageError(e, 'product')}
                             style={{
@@ -727,7 +731,7 @@ export default function ShopOwnerInventoryPage() {
               }}
             >
               <img
-                src={normalizeImageUrl(modalProduct.image, 'product')}
+                src={normalizeImageUrl(modalProduct.imageUrl || modalProduct.image, 'product')}
                 alt={modalProduct.name}
                 onError={(e) => handleImageError(e, 'product')}
                 style={{ width: '44px', height: '44px', borderRadius: '8px', objectFit: 'cover' }}
