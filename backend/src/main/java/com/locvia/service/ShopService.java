@@ -52,13 +52,14 @@ public class ShopService {
     @Transactional(readOnly = true)
     public List<ShopResponse> getAllActiveShops() {
         return shopRepository.findByActiveTrue().stream()
+                .filter(shop -> shop.getStatus() == ShopStatus.APPROVED)
                 .map(ShopResponse::fromEntity)
                 .toList();
     }
 
     /**
-     * Retrieves an active shop by ID for public/customer view.
-     * Inactive shops return 404 Not Found to prevent leaking unlisted stores.
+     * Retrieves an active, approved shop by ID for public/customer view.
+     * Inactive or non-approved shops return 404 Not Found to prevent leaking unlisted stores.
      *
      * @param id target shop ID
      * @return ShopResponse
@@ -66,6 +67,7 @@ public class ShopService {
     @Transactional(readOnly = true)
     public ShopResponse getActiveShopById(Long id) {
         return shopRepository.findByIdAndActiveTrue(id)
+                .filter(shop -> shop.getStatus() == ShopStatus.APPROVED)
                 .map(ShopResponse::fromEntity)
                 .orElseThrow(() -> new ResourceNotFoundException("Shop not found with id: " + id));
     }

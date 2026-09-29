@@ -7,6 +7,7 @@ import com.locvia.dto.UpdateProductRequest;
 import com.locvia.entity.Category;
 import com.locvia.entity.Product;
 import com.locvia.entity.Shop;
+import com.locvia.entity.ShopStatus;
 import com.locvia.entity.User;
 import com.locvia.entity.UserRole;
 import com.locvia.repository.CategoryRepository;
@@ -139,9 +140,13 @@ class ProductApiTests {
 
         // 2. Create shops
         shop1 = new Shop("Green Grocery", "Fresh organic goods", "10 Market Street", "9876541112", "green@example.com", "https://img.example.com/green.jpg", owner1);
+        shop1.setStatus(ShopStatus.APPROVED);
+        shop1.setActive(true);
         shop1 = shopRepository.save(shop1);
 
         shop2 = new Shop("City Supermarket", "Supermarket goods", "20 Main Road", "9876541113", "city@example.com", "https://img.example.com/city.jpg", owner2);
+        shop2.setStatus(ShopStatus.APPROVED);
+        shop2.setActive(true);
         shop2 = shopRepository.save(shop2);
 
         // 3. Create categories

@@ -8,6 +8,7 @@ import com.locvia.entity.Category;
 import com.locvia.entity.Inventory;
 import com.locvia.entity.Product;
 import com.locvia.entity.Shop;
+import com.locvia.entity.ShopStatus;
 import com.locvia.entity.User;
 import com.locvia.entity.UserRole;
 import com.locvia.exception.ResourceNotFoundException;
@@ -86,6 +87,12 @@ public class ProductService {
     public ProductResponse getPublicProductById(Long id) {
         Product product = productRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+
+        if (product.getShop() != null && (!Boolean.TRUE.equals(product.getShop().getActive())
+                || product.getShop().getStatus() != ShopStatus.APPROVED)) {
+            throw new ResourceNotFoundException("Product not found with id: " + id);
+        }
+
         return toProductResponseWithStock(product);
     }
 
@@ -159,24 +166,41 @@ public class ProductService {
     }
 
     /**
-     * Lists all products (active and inactive) for a specific shop.
-     * Enforces that the caller owns the shop or is an admin.
+     * Lists products belonging to a specific shop.
+     * <p>
+     * - The owning shop owner or an administrator receives all products (active and inactive) for catalog management.
+     * - Customers and public visitors receive active products for approved and active shops.
+     * - Requests for inactive or non-approved shops by non-owners return 404 Not Found.
      *
      * @param shopId      target shop ID
-     * @param callerEmail authenticated user email
+     * @param callerEmail authenticated user email (optional)
      * @return list of ProductResponse
      */
     @Transactional(readOnly = true)
     public List<ProductResponse> getProductsForShop(Long shopId, String callerEmail) {
-        User caller = findUserByEmail(callerEmail);
         Shop shop = shopRepository.findById(shopId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shop not found with id: " + shopId));
 
-        if (caller.getRole() != UserRole.ADMIN && !shop.getOwner().getId().equals(caller.getId())) {
-            throw new AccessDeniedException("Access denied: You do not have permission to view products for another owner's shop");
+        User caller = (callerEmail != null) ? userRepository.findByEmail(callerEmail).orElse(null) : null;
+        boolean isOwnerOrAdmin = caller != null && (
+                caller.getRole() == UserRole.ADMIN ||
+                (caller.getRole() == UserRole.SHOP_OWNER && shop.getOwner() != null && shop.getOwner().getId().equals(caller.getId()))
+        );
+
+        if (isOwnerOrAdmin) {
+            // Owning shop owner and admin can view all products (including inactive) for store management
+            List<Product> products = productRepository.findByShopId(shopId);
+            return mapProductsWithStock(products);
         }
 
-        List<Product> products = productRepository.findByShopId(shopId);
+        // Customer or unauthenticated visitor view:
+        // Shop must be approved and active
+        if (!Boolean.TRUE.equals(shop.getActive()) || shop.getStatus() != ShopStatus.APPROVED) {
+            throw new ResourceNotFoundException("Shop not found with id: " + shopId);
+        }
+
+        // Return only active products for customer storefront
+        List<Product> products = productRepository.findByShopIdAndActiveTrue(shopId);
         return mapProductsWithStock(products);
     }
 

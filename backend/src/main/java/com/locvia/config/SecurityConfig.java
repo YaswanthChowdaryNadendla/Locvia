@@ -98,8 +98,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/shops/my", "/api/shops/my/**").hasRole("SHOP_OWNER")
                         .requestMatchers(HttpMethod.POST, "/api/shops").hasRole("SHOP_OWNER")
                         .requestMatchers(HttpMethod.PUT, "/api/shops/**").hasRole("SHOP_OWNER")
-                        // Shop-scoped product management
-                        .requestMatchers("/api/shops/{shopId:[0-9]+}/products", "/api/shops/{shopId:[0-9]+}/products/**").hasAnyRole("SHOP_OWNER", "ADMIN")
+                        // Shop-scoped product management & public storefront catalog
+                        .requestMatchers(HttpMethod.GET, "/api/shops/{shopId:[0-9]+}/products").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/shops/{shopId:[0-9]+}/products").hasAnyRole("SHOP_OWNER", "ADMIN")
+                        .requestMatchers("/api/shops/{shopId:[0-9]+}/products/**").hasAnyRole("SHOP_OWNER", "ADMIN")
                         // Shop-scoped inventory management
                         .requestMatchers("/api/shops/{shopId:[0-9]+}/inventory", "/api/shops/{shopId:[0-9]+}/inventory/**").hasAnyRole("SHOP_OWNER", "ADMIN")
                         // Shop-scoped order management

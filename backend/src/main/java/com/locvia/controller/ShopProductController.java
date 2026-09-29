@@ -18,7 +18,6 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/shops/{shopId}/products")
-@PreAuthorize("hasAnyRole('SHOP_OWNER', 'ADMIN')")
 public class ShopProductController {
 
     private final ProductService productService;
@@ -37,6 +36,7 @@ public class ShopProductController {
      * @return created ProductResponse with HTTP 201 Created
      */
     @PostMapping
+    @PreAuthorize("hasAnyRole('SHOP_OWNER', 'ADMIN')")
     public ResponseEntity<ProductResponse> createProduct(
             @PathVariable Long shopId,
             @Valid @RequestBody CreateProductRequest request,
@@ -46,18 +46,21 @@ public class ShopProductController {
     }
 
     /**
-     * Lists all products belonging to the specified shop.
+     * Lists products belonging to the specified shop.
+     * Accessible by customers and the public for approved/active shops,
+     * and by the owning shop owner/administrator for store management.
      * GET /api/shops/{shopId}/products
      *
      * @param shopId    target shop ID
-     * @param principal authenticated user principal
+     * @param principal authenticated user principal (optional)
      * @return list of ProductResponse
      */
     @GetMapping
     public ResponseEntity<List<ProductResponse>> getProductsForShop(
             @PathVariable Long shopId,
             Principal principal) {
-        List<ProductResponse> products = productService.getProductsForShop(shopId, principal.getName());
+        String callerEmail = principal != null ? principal.getName() : null;
+        List<ProductResponse> products = productService.getProductsForShop(shopId, callerEmail);
         return ResponseEntity.ok(products);
     }
 }

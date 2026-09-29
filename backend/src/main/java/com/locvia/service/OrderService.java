@@ -27,6 +27,7 @@ public class OrderService {
     private final InventoryRepository inventoryRepository;
     private final UserRepository userRepository;
     private final ShopRepository shopRepository;
+    private final ProductRepository productRepository;
 
     public OrderService(OrderRepository orderRepository,
                         OrderItemRepository orderItemRepository,
@@ -35,7 +36,8 @@ public class OrderService {
                         AddressRepository addressRepository,
                         InventoryRepository inventoryRepository,
                         UserRepository userRepository,
-                        ShopRepository shopRepository) {
+                        ShopRepository shopRepository,
+                        ProductRepository productRepository) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.cartRepository = cartRepository;
@@ -44,6 +46,7 @@ public class OrderService {
         this.inventoryRepository = inventoryRepository;
         this.userRepository = userRepository;
         this.shopRepository = shopRepository;
+        this.productRepository = productRepository;
     }
 
     /**
@@ -152,9 +155,14 @@ public class OrderService {
             );
             OrderItem savedItem = orderItemRepository.save(orderItem);
 
-            // Deduct inventory
-            inventory.setQuantity(inventory.getQuantity() - cartItem.getQuantity());
+            // Deduct inventory and synchronize Product stock
+            int newQuantity = inventory.getQuantity() - cartItem.getQuantity();
+            inventory.setQuantity(newQuantity);
+            inventory.setAvailable(newQuantity > 0);
             inventoryRepository.save(inventory);
+
+            product.setStock(newQuantity);
+            productRepository.save(product);
 
             totalItemCount += cartItem.getQuantity();
             itemResponses.add(mapToOrderItemResponse(savedItem));
@@ -239,13 +247,19 @@ public class OrderService {
             throw new IllegalStateException("Cannot cancel order in status: " + order.getStatus());
         }
 
-        // Restore deducted inventory
+        // Restore deducted inventory and synchronize Product stock
         List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
         for (OrderItem item : items) {
             if (item.getProduct() != null) {
                 inventoryRepository.findByProductId(item.getProduct().getId()).ifPresent(inventory -> {
-                    inventory.setQuantity(inventory.getQuantity() + item.getQuantity());
+                    int restoredQuantity = inventory.getQuantity() + item.getQuantity();
+                    inventory.setQuantity(restoredQuantity);
+                    inventory.setAvailable(restoredQuantity > 0);
                     inventoryRepository.save(inventory);
+
+                    Product prod = item.getProduct();
+                    prod.setStock(restoredQuantity);
+                    productRepository.save(prod);
                 });
             }
         }
@@ -380,14 +394,20 @@ public class OrderService {
             throw new IllegalStateException("Cannot alter status of an already CANCELLED order.");
         }
 
-        // If transitioning to CANCELLED, restore inventory
+        // If transitioning to CANCELLED, restore inventory and synchronize Product stock
         if (newStatus == OrderStatus.CANCELLED) {
             List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
             for (OrderItem item : items) {
                 if (item.getProduct() != null) {
                     inventoryRepository.findByProductId(item.getProduct().getId()).ifPresent(inventory -> {
-                        inventory.setQuantity(inventory.getQuantity() + item.getQuantity());
+                        int restoredQuantity = inventory.getQuantity() + item.getQuantity();
+                        inventory.setQuantity(restoredQuantity);
+                        inventory.setAvailable(restoredQuantity > 0);
                         inventoryRepository.save(inventory);
+
+                        Product prod = item.getProduct();
+                        prod.setStock(restoredQuantity);
+                        productRepository.save(prod);
                     });
                 }
             }
@@ -519,7 +539,8 @@ public class OrderService {
         }
 
         AdminOrderResponse updated = updateOrderStatusForAdmin(orderId, newStatus);
-        return mapToShopOrderResponse(order, shopId);
+        Order updatedOrder = orderRepository.findById(orderId).orElse(order);
+        return mapToShopOrderResponse(updatedOrder, shopId);
     }
 
     private AdminOrderResponse mapToShopOrderResponse(Order order, Long shopId) {
