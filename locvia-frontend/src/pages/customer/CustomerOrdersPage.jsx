@@ -468,7 +468,7 @@ const CustomerOrdersPage = () => {
                               return (
                                 <button
                                   key={item.productId || item.id}
-                                  onClick={() => navigate(`/customer/product/${item.productId || item.id}`)}
+                                  onClick={() => navigate(`/customer/product/${item.productId || item.id}?action=review`)}
                                   title={item.name}
                                   style={{
                                     display: 'flex', alignItems: 'center', gap: '4px',

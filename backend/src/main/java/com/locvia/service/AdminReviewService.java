@@ -2,8 +2,10 @@ package com.locvia.service;
 
 import com.locvia.dto.AdminReviewResponse;
 import com.locvia.entity.Review;
+import com.locvia.entity.Shop;
 import com.locvia.exception.ResourceNotFoundException;
 import com.locvia.repository.ReviewRepository;
+import com.locvia.repository.ShopRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,9 +18,11 @@ import java.util.List;
 public class AdminReviewService {
 
     private final ReviewRepository reviewRepository;
+    private final ShopRepository shopRepository;
 
-    public AdminReviewService(ReviewRepository reviewRepository) {
+    public AdminReviewService(ReviewRepository reviewRepository, ShopRepository shopRepository) {
         this.reviewRepository = reviewRepository;
+        this.shopRepository = shopRepository;
     }
 
     /**
@@ -48,7 +52,25 @@ public class AdminReviewService {
     public void deleteReview(Long id) {
         Review review = reviewRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Review not found with id: " + id));
+        Shop shop = review.getShop();
         reviewRepository.delete(review);
+        if (shop != null) {
+            Double avg = reviewRepository.getAverageRatingForShop(shop.getId());
+            shop.setRating(avg != null ? Math.round(avg * 10.0) / 10.0 : 0.0);
+            shopRepository.save(shop);
+        }
+    }
+
+    /**
+     * Resets and deletes all reviews across the platform and resets shop ratings.
+     */
+    @Transactional
+    public void deleteAllReviews() {
+        reviewRepository.deleteAll();
+        shopRepository.findAll().forEach(s -> {
+            s.setRating(0.0);
+            shopRepository.save(s);
+        });
     }
 
     private AdminReviewResponse mapToResponse(Review review) {

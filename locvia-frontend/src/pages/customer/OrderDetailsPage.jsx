@@ -349,7 +349,7 @@ const OrderDetailsPage = () => {
                                 const existing = getReviewForProduct(currentUser?.id || 'cust-01', pid);
                                 return (
                                   <button
-                                    onClick={() => navigate(`/customer/product/${pid}`)}
+                                    onClick={() => navigate(`/customer/product/${pid}?action=review`)}
                                     style={{
                                       marginTop: '6px',
                                       display: 'inline-flex', alignItems: 'center', gap: '4px',

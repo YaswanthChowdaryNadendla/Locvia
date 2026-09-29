@@ -239,6 +239,30 @@ export const deleteShop = async (shopId) => {
   return axiosClient.delete(ENDPOINTS.ADMIN.SHOP_BY_ID(shopId));
 };
 
+/**
+ * Fetches all reviews across the platform.
+ * GET /api/admin/reviews
+ */
+export const getReviews = async (params = {}) => {
+  return axiosClient.get(ENDPOINTS.ADMIN.REVIEWS, { params });
+};
+
+/**
+ * Moderates and deletes a review by ID.
+ * DELETE /api/admin/reviews/{id}
+ */
+export const deleteReview = async (reviewId) => {
+  return axiosClient.delete(ENDPOINTS.ADMIN.REVIEW_BY_ID(reviewId));
+};
+
+/**
+ * Resets / deletes all platform reviews.
+ * POST /api/admin/reviews/reset
+ */
+export const resetReviews = async () => {
+  return axiosClient.post(`${ENDPOINTS.ADMIN.REVIEWS}/reset`);
+};
+
 export default {
   getUsers,
   updateUserStatus,
@@ -261,6 +285,9 @@ export default {
   updateOrderStatus,
   getDeliveries,
   getPayments,
+  getReviews,
+  deleteReview,
+  resetReviews,
   getSystemMetrics,
 };
 

@@ -31,4 +31,23 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
      * Deletes all items belonging to a specific order.
      */
     void deleteByOrderId(Long orderId);
+
+    /**
+     * Finds delivered order items for a specific customer and product.
+     */
+    @org.springframework.data.jpa.repository.Query("SELECT oi FROM OrderItem oi WHERE oi.order.user.id = :userId AND oi.product.id = :productId AND oi.order.status = :status ORDER BY oi.order.createdAt DESC")
+    List<OrderItem> findDeliveredOrderItems(
+            @org.springframework.data.repository.query.Param("userId") Long userId,
+            @org.springframework.data.repository.query.Param("productId") Long productId,
+            @org.springframework.data.repository.query.Param("status") com.locvia.entity.OrderStatus status
+    );
+
+    /**
+     * Finds any order items for a specific customer and product regardless of order status.
+     */
+    @org.springframework.data.jpa.repository.Query("SELECT oi FROM OrderItem oi WHERE oi.order.user.id = :userId AND oi.product.id = :productId ORDER BY oi.order.createdAt DESC")
+    List<OrderItem> findAllOrderItemsForCustomerAndProduct(
+            @org.springframework.data.repository.query.Param("userId") Long userId,
+            @org.springframework.data.repository.query.Param("productId") Long productId
+    );
 }

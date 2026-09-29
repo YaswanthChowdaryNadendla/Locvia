@@ -1,8 +1,8 @@
 // src/services/api/reviewApi.js
 // Customer Reviews & Ratings API service for Spring Boot backend integration.
 
-import axiosClient from './axiosClient';
-import { ENDPOINTS } from './endpoints';
+import axiosClient from './axiosClient.js';
+import { ENDPOINTS } from './endpoints.js';
 
 /**
  * Fetches all reviews and rating aggregates for a product.
@@ -58,19 +58,52 @@ export const deleteReview = async (id) => {
 };
 
 /**
+ * Checks eligibility of the current logged-in customer to review a product.
+ * @param {string|number} productId
+ * @returns {Promise<{ eligible: boolean, alreadyReviewed: boolean, existingReview: Object|null, deliveredOrderId: number|null, message: string }>}
+ */
+export const checkEligibility = async (productId) => {
+  return axiosClient.get(ENDPOINTS.REVIEWS.ELIGIBILITY(productId));
+};
+
+/**
+ * Fetches all reviews across the platform (admin moderation).
+ * @param {Object} [params]
+ * @returns {Promise<Array<Object>>}
+ */
+export const getAllReviews = async (params = {}) => {
+  return axiosClient.get(ENDPOINTS.ADMIN.REVIEWS, { params });
+};
+
+/**
+ * Resets / deletes all reviews across the platform (admin only).
+ * @returns {Promise<Object>}
+ */
+export const resetReviews = async () => {
+  return axiosClient.post(`${ENDPOINTS.ADMIN.REVIEWS}/reset`);
+};
+
+/**
  * Toggles a helpful vote on a review.
  * @param {string} id
  * @returns {Promise<{ helpful: number, voted: boolean }>}
  */
 export const voteHelpful = async (id) => {
-  return axiosClient.post(ENDPOINTS.REVIEWS.VOTE_HELPFUL(id));
+  try {
+    return await axiosClient.post(`/reviews/${id}/helpful`);
+  } catch {
+    return { helpful: 0, voted: false };
+  }
 };
 
 export default {
   getProductReviews,
   getShopReviews,
+  checkEligibility,
   submitReview,
   updateReview,
   deleteReview,
+  getAllReviews,
+  resetReviews,
   voteHelpful,
 };

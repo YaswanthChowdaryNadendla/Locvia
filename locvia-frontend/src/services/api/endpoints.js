@@ -113,6 +113,15 @@ export const ENDPOINTS = {
     RAZORPAY_WEBHOOK: '/payments/razorpay/webhook',
   },
 
+  // Customer Reviews & Ratings (ReviewController.java)
+  REVIEWS: {
+    BASE: '/reviews',
+    BY_PRODUCT: (productId) => `/reviews/product/${productId}`,
+    BY_SHOP: (shopId) => `/reviews/shop/${shopId}`,
+    ELIGIBILITY: (productId) => `/reviews/eligibility/${productId}`,
+    DETAIL: (id) => `/reviews/${id}`,
+  },
+
   // Platform Administration (Admin Controllers)
   ADMIN: {
     METRICS: '/admin/metrics',

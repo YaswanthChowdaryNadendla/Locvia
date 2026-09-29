@@ -129,6 +129,14 @@ public class SecurityConfig {
                         .requestMatchers("/api/delivery/requests", "/api/delivery/active", "/api/delivery/completed").hasRole("DELIVERY_PARTNER")
                         // Delivery partner & admin delivery details and status updates
                         .requestMatchers("/api/delivery", "/api/delivery/**").hasAnyRole("DELIVERY_PARTNER", "ADMIN")
+                        // Public reviews discovery (products and shops)
+                        .requestMatchers(HttpMethod.GET, "/api/reviews/product/**", "/api/reviews/products/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/reviews/shop/**", "/api/reviews/shops/**").permitAll()
+                        // Customer review creation and management
+                        .requestMatchers("/api/reviews/eligibility/**").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.POST, "/api/reviews").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.PUT, "/api/reviews/**").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/reviews/**").hasAnyRole("CUSTOMER", "ADMIN")
                         // User management endpoints require authentication
                         .requestMatchers("/api/users/**").authenticated()
                         // All other endpoints require authentication by default

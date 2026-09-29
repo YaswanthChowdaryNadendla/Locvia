@@ -56,9 +56,19 @@ public class AdminReviewController {
      * @param id target review ID
      * @return success confirmation
      */
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{id:[0-9]+}")
     public ResponseEntity<Map<String, String>> deleteReview(@PathVariable Long id) {
         adminReviewService.deleteReview(id);
         return ResponseEntity.ok(Map.of("message", "Review deleted successfully"));
+    }
+
+    /**
+     * Resets / clears all platform reviews (for test/dummy data purge).
+     * DELETE /api/admin/reviews/reset or POST /api/admin/reviews/reset
+     */
+    @RequestMapping(value = "/reset", method = {RequestMethod.DELETE, RequestMethod.POST})
+    public ResponseEntity<Map<String, String>> resetReviews() {
+        adminReviewService.deleteAllReviews();
+        return ResponseEntity.ok(Map.of("message", "All reviews reset successfully"));
     }
 }

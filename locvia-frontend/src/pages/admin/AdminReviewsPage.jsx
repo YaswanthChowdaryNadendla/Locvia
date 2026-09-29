@@ -40,7 +40,15 @@ export default function AdminReviewsPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const load = useCallback(() => setReviews(getAllReviews()), []);
+  const load = useCallback(async () => {
+    try {
+      const data = await getAllReviews();
+      setReviews(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('[AdminReviewsPage] Failed to fetch reviews:', err);
+      setReviews([]);
+    }
+  }, []);
   useEffect(() => { load(); }, [load]);
 
   const summary = useMemo(() => calculateReviewSummary(reviews), [reviews]);
@@ -68,12 +76,9 @@ export default function AdminReviewsPage() {
     if (!pendingDelete || isDeleting) return;
     setIsDeleting(true);
     try {
-      // Admin can delete any review — bypass ownership check by passing matching userId
-      const all = getAllReviews();
-      const rev = all.find((r) => r.id === pendingDelete.id);
-      if (rev) deleteReview(rev.id, rev.userId);
+      await deleteReview(pendingDelete.id, pendingDelete.userId);
       showToast('Review deleted.');
-      load();
+      await load();
     } catch {
       showToast('Failed to delete review.', 'error');
     } finally {

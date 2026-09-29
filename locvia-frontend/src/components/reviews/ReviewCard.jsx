@@ -14,7 +14,7 @@ const ReviewCard = ({
   onDeleteRequest,
   onUpdated,
 }) => {
-  const isOwn = currentUserId && review.userId === currentUserId;
+  const isOwn = Boolean(currentUserId && (review.userId === currentUserId || String(review.userId) === String(currentUserId)));
   const [helpfulCount, setHelpfulCount] = useState(review.helpful || 0);
   const [hasVoted, setHasVoted] = useState(
     currentUserId ? (review.helpfulVotedBy || []).includes(currentUserId) : false

@@ -778,4 +778,61 @@ test('Integration Suite - Module 65', async (t) => {
     assert.ok(productsSrc.includes('Low Stock'));
     assert.ok(productsSrc.includes('Out of Stock'));
   });
+
+  await t.test('57. ENDPOINTS.REVIEWS defines all required customer review endpoints', () => {
+    assert.equal(ENDPOINTS.REVIEWS.BASE, '/reviews');
+    assert.equal(ENDPOINTS.REVIEWS.BY_PRODUCT(10), '/reviews/product/10');
+    assert.equal(ENDPOINTS.REVIEWS.BY_SHOP(5), '/reviews/shop/5');
+    assert.equal(ENDPOINTS.REVIEWS.ELIGIBILITY(10), '/reviews/eligibility/10');
+    assert.equal(ENDPOINTS.REVIEWS.DETAIL(99), '/reviews/99');
+  });
+
+  await t.test('58. ENDPOINTS.ADMIN defines admin review moderation endpoints', () => {
+    assert.equal(ENDPOINTS.ADMIN.REVIEWS, '/admin/reviews');
+    assert.equal(ENDPOINTS.ADMIN.REVIEW_BY_ID(42), '/admin/reviews/42');
+  });
+
+  await t.test('59. calculateReviewSummary computes accurate average, count, and star distribution', async () => {
+    const { calculateReviewSummary } = await import('../services/reviewService.js');
+    const sampleReviews = [
+      { rating: 5, comment: 'Great' },
+      { rating: 4, comment: 'Good' },
+      { rating: 5, comment: 'Awesome' },
+      { rating: 2, comment: 'Not fresh' },
+    ];
+    const summary = calculateReviewSummary(sampleReviews);
+    assert.equal(summary.total, 4);
+    assert.equal(summary.average, 4); // (5+4+5+2)/4 = 4.0
+    assert.equal(summary.distribution[5], 2);
+    assert.equal(summary.distribution[4], 1);
+    assert.equal(summary.distribution[3], 0);
+    assert.equal(summary.distribution[2], 1);
+    assert.equal(summary.distribution[1], 0);
+  });
+
+  await t.test('60. isOrderReviewable strictly requires DELIVERED or COMPLETED status', async () => {
+    const { isOrderReviewable } = await import('../services/reviewService.js');
+    assert.equal(isOrderReviewable({ orderStatus: 'DELIVERED' }), true);
+    assert.equal(isOrderReviewable({ status: 'delivered' }), true);
+    assert.equal(isOrderReviewable({ orderStatus: 'COMPLETED' }), true);
+    assert.equal(isOrderReviewable({ orderStatus: 'PENDING' }), false);
+    assert.equal(isOrderReviewable({ orderStatus: 'CONFIRMED' }), false);
+    assert.equal(isOrderReviewable({ orderStatus: 'PREPARING' }), false);
+    assert.equal(isOrderReviewable({ orderStatus: 'READY_FOR_PICKUP' }), false);
+    assert.equal(isOrderReviewable({ orderStatus: 'OUT_FOR_DELIVERY' }), false);
+    assert.equal(isOrderReviewable({ orderStatus: 'CANCELLED' }), false);
+  });
+
+  await t.test('61. Zero dummy review records in localStorage or mock storage', () => {
+    assert.equal(localStorage.getItem('locvia_reviews'), null);
+  });
+
+  await t.test('62. ProductDetailsPage connects to live reviewApi and handles eligibility', () => {
+    const pdpSrc = fs.readFileSync(path.resolve(__dirname, '../pages/customer/ProductDetailsPage.jsx'), 'utf8');
+    assert.ok(pdpSrc.includes('reviewApi.getProductReviews'));
+    assert.ok(pdpSrc.includes('reviewApi.checkEligibility'));
+    assert.ok(pdpSrc.includes('reviewApi.submitReview'));
+    assert.ok(pdpSrc.includes('reviewApi.updateReview'));
+    assert.ok(pdpSrc.includes('reviewApi.deleteReview'));
+  });
 });

@@ -1,204 +1,165 @@
 // src/services/reviewService.js
 // Module 36 — Product Reviews & Ratings Service
-// Master review source: localStorage key 'locvia_reviews'
-// All reviews are a flat array. Filter by productId, shopId, userId, orderId as needed.
+// Real API integration with Spring Boot backend via reviewApi.
+// All mock and localStorage review data have been purged; the database is the single source of truth.
 
-import { getLocalOrders } from './orderService';
+import * as reviewApi from './api/reviewApi.js';
 
-export const REVIEWS_KEY = 'locvia_reviews';
-
-// ── ID generation ──────────────────────────────────────────────
-export const generateReviewId = () =>
-  `rev-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-// ── localStorage helpers ───────────────────────────────────────
-export const readReviews = () => {
-  try {
-    const raw = localStorage.getItem(REVIEWS_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch (err) {
-    console.error('[reviewService] Failed to parse reviews from localStorage:', err);
+// Purge any stale mock reviews from localStorage
+try {
+  if (typeof localStorage !== 'undefined' && localStorage.getItem('locvia_reviews')) {
+    localStorage.removeItem('locvia_reviews');
   }
-  return [];
-};
-
-const writeReviews = (reviews) => {
-  try {
-    localStorage.setItem(REVIEWS_KEY, JSON.stringify(reviews));
-  } catch (err) {
-    console.error('[reviewService] Failed to write reviews to localStorage:', err);
-  }
-};
+} catch {
+  // Ignore storage exceptions
+}
 
 // ── Delivered/completed status check ──────────────────────────
 const REVIEWABLE_STATUSES = ['DELIVERED', 'COMPLETED'];
 
 export const isOrderReviewable = (order) =>
-  REVIEWABLE_STATUSES.includes((order?.orderStatus || '').toUpperCase());
+  REVIEWABLE_STATUSES.includes((order?.orderStatus || order?.status || '').toUpperCase());
 
-// ── Purchase verification ──────────────────────────────────────
+// ── Purchase & Eligibility verification ────────────────────────
 /**
- * Returns all delivered orders for a user that contain a given productId.
- * productId is compared as both string and number.
+ * Checks whether the current user is eligible to review the given product.
+ * Returns true if the user purchased and received the product.
+ * @param {string|number} userId
+ * @param {string|number} productId
+ * @returns {Promise<boolean>}
  */
-export const getDeliveredOrdersWithProduct = (userId, productId) => {
+export const canUserReviewProduct = async (userId, productId) => {
   try {
-    const orders = getLocalOrders();
-    const pid = String(productId);
-    return orders.filter((o) => {
-      if (o.userId !== userId && o.userId !== 'cust-01') return false;
-      if (!isOrderReviewable(o)) return false;
-      return (o.items || []).some(
-        (item) => String(item.productId) === pid || String(item.id) === pid
-      );
-    });
+    const res = await reviewApi.checkEligibility(productId);
+    return !!res?.eligible;
   } catch {
-    return [];
+    return false;
   }
 };
 
 /**
- * Returns whether the user has purchased (and received) the product.
- * Used to gate review submission.
+ * Checks if a specific review by the user for a product exists.
+ * @param {string|number} userId
+ * @param {string|number} productId
+ * @returns {Promise<Object|null>}
  */
-export const canUserReviewProduct = (userId, productId) => {
-  return getDeliveredOrdersWithProduct(userId, productId).length > 0;
-};
-
-/**
- * Returns all delivered/completed orders for a user (for the orders page review badges).
- */
-export const getDeliveredOrders = (userId) => {
+export const getReviewForProduct = async (userId, productId) => {
   try {
-    const orders = getLocalOrders();
-    return orders.filter((o) => {
-      if (o.userId !== userId && o.userId !== 'cust-01') return false;
-      return isOrderReviewable(o);
-    });
+    const res = await reviewApi.checkEligibility(productId);
+    return res?.existingReview || null;
   } catch {
-    return [];
+    return null;
   }
 };
 
 // ── Core review CRUD ───────────────────────────────────────────
 
-/** getProductReviews — all reviews for a product */
-export const getProductReviews = (productId) => {
-  const pid = String(productId);
-  return readReviews().filter((r) => String(r.productId) === pid);
-};
-
-/** getShopReviews — all reviews for a shop */
-export const getShopReviews = (shopId) => {
-  const sid = String(shopId);
-  return readReviews().filter((r) => String(r.shopId) === sid);
-};
-
-/** getUserReviews — all reviews submitted by a user */
-export const getUserReviews = (userId) =>
-  readReviews().filter((r) => r.userId === userId);
-
-/** getReviewForProduct — single review by user for a product (one per user per product) */
-export const getReviewForProduct = (userId, productId) => {
-  const pid = String(productId);
-  return (
-    readReviews().find(
-      (r) => r.userId === userId && String(r.productId) === pid
-    ) || null
-  );
-};
-
-/** getAllReviews — full flat list (for admin) */
-export const getAllReviews = () => readReviews();
-
-/** addReview — create and persist a new review */
-export const addReview = ({
-  userId,
-  userName,
-  productId,
-  shopId,
-  orderId,
-  rating,
-  comment,
-}) => {
-  const reviews = readReviews();
-  const pid = String(productId);
-
-  // Prevent duplicate: one review per user per product
-  const existing = reviews.find(
-    (r) => r.userId === userId && String(r.productId) === pid
-  );
-  if (existing) {
-    throw new Error('DUPLICATE_REVIEW');
+/**
+ * getProductReviews — retrieves all approved reviews and rating summary for a product.
+ * @param {string|number} productId
+ * @returns {Promise<Array<Object>>}
+ */
+export const getProductReviews = async (productId) => {
+  try {
+    const res = await reviewApi.getProductReviews(productId);
+    if (Array.isArray(res)) return res;
+    if (res && Array.isArray(res.reviews)) return res.reviews;
+    return [];
+  } catch (err) {
+    console.error('[reviewService] Failed to fetch product reviews:', err);
+    return [];
   }
-
-  const newReview = {
-    id: generateReviewId(),
-    userId,
-    userName,
-    productId: pid,
-    shopId: shopId ? String(shopId) : null,
-    orderId: orderId || null,
-    rating: Number(rating),
-    comment: comment.trim(),
-    createdAt: new Date().toISOString(),
-    updatedAt: null,
-    helpful: 0,
-    helpfulVotedBy: [],
-    verifiedPurchase: true, // always true since we gate submission by purchase verification
-  };
-  writeReviews([newReview, ...reviews]);
-  return newReview;
 };
 
-/** updateReview — edit an existing review (ownership enforced in UI) */
-export const updateReview = (reviewId, userId, { rating, comment }) => {
-  const reviews = readReviews();
-  const idx = reviews.findIndex((r) => r.id === reviewId);
-  if (idx === -1) throw new Error('Review not found');
-  if (reviews[idx].userId !== userId) throw new Error('NOT_OWNER');
-
-  reviews[idx] = {
-    ...reviews[idx],
-    rating: Number(rating),
-    comment: comment.trim(),
-    updatedAt: new Date().toISOString(),
-  };
-  writeReviews(reviews);
-  return reviews[idx];
+/**
+ * getShopReviews — retrieves reviews for all products belonging to a shop.
+ * @param {string|number} shopId
+ * @returns {Promise<Array<Object>>}
+ */
+export const getShopReviews = async (shopId) => {
+  try {
+    const res = await reviewApi.getShopReviews(shopId);
+    if (Array.isArray(res)) return res;
+    if (res && Array.isArray(res.reviews)) return res.reviews;
+    return [];
+  } catch (err) {
+    console.error('[reviewService] Failed to fetch shop reviews:', err);
+    return [];
+  }
 };
 
-/** deleteReview — remove a review (ownership enforced in UI) */
-export const deleteReview = (reviewId, userId) => {
-  const reviews = readReviews();
-  const idx = reviews.findIndex((r) => r.id === reviewId);
-  if (idx === -1) return false;
-  if (reviews[idx].userId !== userId) throw new Error('NOT_OWNER');
-  reviews.splice(idx, 1);
-  writeReviews(reviews);
+/**
+ * getAllReviews — retrieves all platform reviews (for admin moderation).
+ * @returns {Promise<Array<Object>>}
+ */
+export const getAllReviews = async () => {
+  try {
+    const res = await reviewApi.getAllReviews();
+    if (Array.isArray(res)) return res;
+    if (res && Array.isArray(res.content)) return res.content;
+    return [];
+  } catch (err) {
+    console.error('[reviewService] Failed to fetch admin reviews:', err);
+    return [];
+  }
+};
+
+/**
+ * addReview — submits a new review to the backend.
+ * @param {Object} params
+ * @param {string|number} params.productId
+ * @param {number} params.rating
+ * @param {string} params.comment
+ * @param {string|number} [params.orderId]
+ * @returns {Promise<Object>}
+ */
+export const addReview = async ({ productId, rating, comment, orderId }) => {
+  return await reviewApi.submitReview({
+    productId: Number(productId),
+    rating: Number(rating),
+    comment: comment.trim(),
+    orderId: orderId ? Number(orderId) : null,
+  });
+};
+
+/**
+ * updateReview — updates an existing customer review.
+ * @param {string|number} reviewId
+ * @param {string|number} userId
+ * @param {Object} params
+ * @param {number} params.rating
+ * @param {string} params.comment
+ * @returns {Promise<Object>}
+ */
+export const updateReview = async (reviewId, userId, { rating, comment }) => {
+  return await reviewApi.updateReview(reviewId, {
+    rating: Number(rating),
+    comment: comment.trim(),
+  });
+};
+
+/**
+ * deleteReview — deletes a review by ID.
+ * @param {string|number} reviewId
+ * @returns {Promise<boolean>}
+ */
+export const deleteReview = async (reviewId) => {
+  await reviewApi.deleteReview(reviewId);
   return true;
 };
 
-/** voteHelpful — toggle helpful vote */
-export const voteHelpful = (reviewId, userId) => {
-  const reviews = readReviews();
-  const idx = reviews.findIndex((r) => r.id === reviewId);
-  if (idx === -1) return null;
-  const review = reviews[idx];
-  const alreadyVoted = (review.helpfulVotedBy || []).includes(userId);
-  if (alreadyVoted) {
-    review.helpfulVotedBy = review.helpfulVotedBy.filter((id) => id !== userId);
-    review.helpful = Math.max(0, (review.helpful || 0) - 1);
-  } else {
-    review.helpfulVotedBy = [...(review.helpfulVotedBy || []), userId];
-    review.helpful = (review.helpful || 0) + 1;
+/**
+ * voteHelpful — toggles helpful vote.
+ * @param {string|number} reviewId
+ * @returns {Promise<number>}
+ */
+export const voteHelpful = async (reviewId) => {
+  try {
+    const res = await reviewApi.voteHelpful(reviewId);
+    return res?.helpful ?? 0;
+  } catch {
+    return 0;
   }
-  reviews[idx] = review;
-  writeReviews(reviews);
-  return review.helpful;
 };
 
 // ── Summary calculation ────────────────────────────────────────
@@ -237,4 +198,19 @@ export const formatReviewDate = (isoString) => {
   } catch {
     return '';
   }
+};
+
+export default {
+  isOrderReviewable,
+  canUserReviewProduct,
+  getReviewForProduct,
+  getProductReviews,
+  getShopReviews,
+  getAllReviews,
+  addReview,
+  updateReview,
+  deleteReview,
+  voteHelpful,
+  calculateReviewSummary,
+  formatReviewDate,
 };

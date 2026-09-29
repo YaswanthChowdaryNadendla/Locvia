@@ -51,4 +51,32 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
      * Finds all reviews associated with a specific product.
      */
     List<Review> findByProductId(Long productId);
+
+    /**
+     * Finds a review authored by a specific user for a specific product.
+     */
+    java.util.Optional<Review> findByUserIdAndProductId(Long userId, Long productId);
+
+    /**
+     * Checks if a user has already reviewed a product.
+     */
+    boolean existsByUserIdAndProductId(Long userId, Long productId);
+
+    /**
+     * Computes the average star rating for a product.
+     */
+    @org.springframework.data.jpa.repository.Query("SELECT AVG(r.rating) FROM Review r WHERE r.product.id = :productId")
+    Double getAverageRatingForProduct(@org.springframework.data.repository.query.Param("productId") Long productId);
+
+    /**
+     * Computes the total number of reviews for a product.
+     */
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(r) FROM Review r WHERE r.product.id = :productId")
+    Long countReviewsForProduct(@org.springframework.data.repository.query.Param("productId") Long productId);
+
+    /**
+     * Computes the average star rating across all products belonging to a shop.
+     */
+    @org.springframework.data.jpa.repository.Query("SELECT AVG(r.rating) FROM Review r WHERE r.shop.id = :shopId")
+    Double getAverageRatingForShop(@org.springframework.data.repository.query.Param("shopId") Long shopId);
 }

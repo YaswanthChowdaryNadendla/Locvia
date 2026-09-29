@@ -3,7 +3,7 @@
 // MODULE 36 — Reviews & Ratings integration
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Star, Minus, Plus, ShoppingBag, Check, MapPin,
   Clock, ShieldCheck, AlertCircle, MessageSquare, Pencil, LogIn,
@@ -16,14 +16,9 @@ import { normalizeImageUrl, handleImageError } from '../../utils/imageUtils';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { ROLES } from '../../data/users';
+import * as reviewApi from '../../services/api/reviewApi';
 import {
-  getProductReviews,
   calculateReviewSummary,
-  getReviewForProduct,
-  canUserReviewProduct,
-  addReview,
-  updateReview,
-  deleteReview,
 } from '../../services/reviewService';
 import StarRating from '../../components/reviews/StarRating';
 import RatingDistribution from '../../components/reviews/RatingDistribution';
@@ -89,13 +84,35 @@ const ProductDetailsPage = () => {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  const loadReviews = useCallback((pid) => {
-    const all = getProductReviews(pid);
-    setReviews(all);
-    setReviewSummary(calculateReviewSummary(all));
-    if (currentUser) {
-      setUserReview(getReviewForProduct(currentUser.id, pid));
-      setCanReview(canUserReviewProduct(currentUser.id, pid));
+  const location = useLocation();
+
+  const loadReviews = useCallback(async (pid) => {
+    if (!pid) return;
+    try {
+      const response = await reviewApi.getProductReviews(pid);
+      const revList = response?.reviews || (Array.isArray(response) ? response : []);
+      const sum = response?.summary || calculateReviewSummary(revList);
+      setReviews(revList);
+      setReviewSummary(sum);
+
+      if (currentUser) {
+        try {
+          const elig = await reviewApi.checkEligibility(pid);
+          setCanReview(!!elig?.eligible);
+          setUserReview(elig?.existingReview || null);
+        } catch {
+          const found = revList.find((r) => String(r.userId) === String(currentUser.id));
+          setUserReview(found || null);
+          setCanReview(!found);
+        }
+      } else {
+        setUserReview(null);
+        setCanReview(false);
+      }
+    } catch (err) {
+      console.error('[ProductDetailsPage] Failed to load reviews:', err);
+      setReviews([]);
+      setReviewSummary({ average: 0, total: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } });
     }
   }, [currentUser]);
 
@@ -126,7 +143,7 @@ const ProductDetailsPage = () => {
       setRelatedProducts(related);
 
       // Load reviews for this product
-      loadReviews(p.id);
+      await loadReviews(p.id);
 
       // Reset state for newly selected product
       setQuantity(1);
@@ -148,6 +165,19 @@ const ProductDetailsPage = () => {
     loadProductData();
   }, [loadProductData]);
 
+  // Check URL query parameters to auto-open review form if arriving from order page
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get('review') === 'true' || searchParams.get('action') === 'review') {
+      if (canReview && !userReview) {
+        setShowForm(true);
+        setTimeout(() => {
+          document.getElementById('reviews-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 400);
+      }
+    }
+  }, [location.search, canReview, userReview]);
+
   // Handle quantity changes
   const effectiveStock = product?.stockQuantity !== undefined
     ? product.stockQuantity
@@ -157,7 +187,6 @@ const ProductDetailsPage = () => {
   const handleIncrement = () => {
     if (quantity < stockLimit) {
       setQuantity(q => q + 1);
-
     }
   };
 
@@ -186,31 +215,30 @@ const ProductDetailsPage = () => {
     return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`;
   };
 
-  const handleSubmitReview = ({ rating, comment }) => {
+  const handleSubmitReview = async ({ rating, comment }) => {
     if (!currentUser || !product) return;
     setReviewLoading(true);
     try {
       if (editingReview) {
-        updateReview(editingReview.id, currentUser.id, { rating, comment });
+        await reviewApi.updateReview(editingReview.id, { rating: Number(rating), comment: comment.trim() });
         showToast('Review updated successfully!');
       } else {
-        addReview({
-          productId: String(product.id),
-          shopId: product.shopId ? String(product.shopId) : null,
-          orderId: null, // product-page submission (not order-linked)
-          userId: currentUser.id,
-          userName: getUserDisplayName(),
-          rating,
-          comment,
+        await reviewApi.submitReview({
+          productId: Number(product.id),
+          rating: Number(rating),
+          comment: comment.trim(),
         });
         showToast('Review submitted! Thank you.');
       }
       setShowForm(false);
       setEditingReview(null);
-      loadReviews(product.id);
+      await loadReviews(product.id);
     } catch (err) {
-      if (err.message === 'DUPLICATE_REVIEW') {
+      const msg = err?.response?.data?.message || err?.message;
+      if (msg && msg.toLowerCase().includes('already reviewed')) {
         showToast('You have already reviewed this product.', 'error');
+      } else if (msg) {
+        showToast(msg, 'error');
       } else {
         showToast('Failed to save review. Please try again.', 'error');
       }
@@ -227,13 +255,15 @@ const ProductDetailsPage = () => {
     }, 100);
   };
 
-  const handleDeleteReview = (review) => {
+  const handleDeleteReview = async (review) => {
+    if (!window.confirm('Are you sure you want to delete your review?')) return;
     try {
-      deleteReview(review.id, currentUser.id);
+      await reviewApi.deleteReview(review.id);
       showToast('Review deleted.');
-      loadReviews(product.id);
-    } catch {
-      showToast('Could not delete review.', 'error');
+      await loadReviews(product.id);
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Could not delete review.';
+      showToast(msg, 'error');
     }
   };
 

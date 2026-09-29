@@ -30,9 +30,22 @@ export default function ShopOwnerReviewsPage() {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
     if (ownerShop?.id) {
-      setReviews(getShopReviews(ownerShop.id));
+      getShopReviews(ownerShop.id)
+        .then((res) => {
+          if (isMounted) {
+            setReviews(Array.isArray(res) ? res : (res?.reviews || []));
+          }
+        })
+        .catch((err) => {
+          console.error('[ShopOwnerReviewsPage] Failed to fetch reviews:', err);
+          if (isMounted) setReviews([]);
+        });
     }
+    return () => {
+      isMounted = false;
+    };
   }, [ownerShop?.id]);
 
   const summary = useMemo(() => calculateReviewSummary(reviews), [reviews]);
