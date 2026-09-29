@@ -39,6 +39,9 @@ public record CreateProductRequest(
         @Size(max = 500, message = "Image URL must not exceed 500 characters")
         String imageUrl,
 
+        @Size(max = 255, message = "Image public ID must not exceed 255 characters")
+        String imagePublicId,
+
         @Min(value = 0, message = "Stock quantity cannot be negative")
         Integer stockQuantity,
 
@@ -53,6 +56,7 @@ public record CreateProductRequest(
             @JsonProperty("discountPrice") BigDecimal discountPrice,
             @JsonProperty("unit") String unit,
             @JsonProperty("imageUrl") String imageUrl,
+            @JsonProperty("imagePublicId") String imagePublicId,
             @JsonProperty("stockQuantity") Integer stockQuantity,
             @JsonProperty("stock") Integer stock) {
         this.categoryId = categoryId;
@@ -62,16 +66,21 @@ public record CreateProductRequest(
         this.discountPrice = discountPrice;
         this.unit = unit;
         this.imageUrl = imageUrl;
+        this.imagePublicId = imagePublicId;
         this.stockQuantity = stockQuantity != null ? stockQuantity : (stock != null ? stock : 0);
         this.stock = this.stockQuantity;
     }
 
     public CreateProductRequest(Long categoryId, String name, String description, BigDecimal price, BigDecimal discountPrice, String unit, String imageUrl) {
-        this(categoryId, name, description, price, discountPrice, unit, imageUrl, 0, 0);
+        this(categoryId, name, description, price, discountPrice, unit, imageUrl, null, 0, 0);
     }
 
     public CreateProductRequest(Long categoryId, String name, String description, BigDecimal price, BigDecimal discountPrice, String unit, String imageUrl, Integer stockQuantity) {
-        this(categoryId, name, description, price, discountPrice, unit, imageUrl, stockQuantity, stockQuantity);
+        this(categoryId, name, description, price, discountPrice, unit, imageUrl, null, stockQuantity, stockQuantity);
+    }
+
+    public CreateProductRequest(Long categoryId, String name, String description, BigDecimal price, BigDecimal discountPrice, String unit, String imageUrl, Integer stockQuantity, Integer stock) {
+        this(categoryId, name, description, price, discountPrice, unit, imageUrl, null, stockQuantity, stock);
     }
 
     public Integer resolvedStock() {

@@ -58,9 +58,10 @@ public class ShopProductController {
     @GetMapping
     public ResponseEntity<List<ProductResponse>> getProductsForShop(
             @PathVariable Long shopId,
+            @RequestParam(required = false, defaultValue = "false") boolean includeInactive,
             Principal principal) {
         String callerEmail = principal != null ? principal.getName() : null;
-        List<ProductResponse> products = productService.getProductsForShop(shopId, callerEmail);
+        List<ProductResponse> products = productService.getProductsForShop(shopId, callerEmail, includeInactive);
         return ResponseEntity.ok(products);
     }
 }

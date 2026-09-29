@@ -10,7 +10,6 @@ import { useAuth } from '../context/AuthContext';
 const SHOP_LINKS = [
   { to: '/shop-owner/dashboard', label: 'Dashboard', icon: Store },
   { to: '/shop-owner/products', label: 'Products', icon: Package },
-  { to: '/shop-owner/inventory', label: 'Inventory', icon: LayoutGrid },
   { to: '/shop-owner/orders', label: 'Orders', icon: ShoppingBag },
   { to: '/shop-owner/reviews', label: 'Reviews', icon: MessageSquare },
   { to: '/shop-owner/shop-profile', label: 'Shop Profile', icon: ShopIcon },

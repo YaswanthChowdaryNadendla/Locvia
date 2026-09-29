@@ -149,6 +149,9 @@ public class ProductService {
         if (request.imageUrl() != null) {
             product.setImageUrl(request.imageUrl().trim());
         }
+        if (request.imagePublicId() != null) {
+            product.setImagePublicId(request.imagePublicId().trim());
+        }
         product.setShop(shop);
         product.setCategory(category);
         product.setActive(true);
@@ -168,16 +171,17 @@ public class ProductService {
     /**
      * Lists products belonging to a specific shop.
      * <p>
-     * - The owning shop owner or an administrator receives all products (active and inactive) for catalog management.
-     * - Customers and public visitors receive active products for approved and active shops.
+     * - Returns active products by default for both customer storefront and standard shop-owner catalog view.
+     * - Owning shop owner and administrator can view inactive products if includeInactive is explicitly true.
      * - Requests for inactive or non-approved shops by non-owners return 404 Not Found.
      *
-     * @param shopId      target shop ID
-     * @param callerEmail authenticated user email (optional)
+     * @param shopId          target shop ID
+     * @param callerEmail     authenticated user email (optional)
+     * @param includeInactive whether to include inactive/deactivated products (restricted to owner/admin)
      * @return list of ProductResponse
      */
     @Transactional(readOnly = true)
-    public List<ProductResponse> getProductsForShop(Long shopId, String callerEmail) {
+    public List<ProductResponse> getProductsForShop(Long shopId, String callerEmail, boolean includeInactive) {
         Shop shop = shopRepository.findById(shopId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shop not found with id: " + shopId));
 
@@ -187,21 +191,24 @@ public class ProductService {
                 (caller.getRole() == UserRole.SHOP_OWNER && shop.getOwner() != null && shop.getOwner().getId().equals(caller.getId()))
         );
 
-        if (isOwnerOrAdmin) {
-            // Owning shop owner and admin can view all products (including inactive) for store management
-            List<Product> products = productRepository.findByShopId(shopId);
-            return mapProductsWithStock(products);
+        if (!isOwnerOrAdmin) {
+            // Customer or unauthenticated visitor view:
+            // Shop must be approved and active
+            if (!Boolean.TRUE.equals(shop.getActive()) || shop.getStatus() != ShopStatus.APPROVED) {
+                throw new ResourceNotFoundException("Shop not found with id: " + shopId);
+            }
         }
 
-        // Customer or unauthenticated visitor view:
-        // Shop must be approved and active
-        if (!Boolean.TRUE.equals(shop.getActive()) || shop.getStatus() != ShopStatus.APPROVED) {
-            throw new ResourceNotFoundException("Shop not found with id: " + shopId);
-        }
+        List<Product> products = (isOwnerOrAdmin && includeInactive)
+                ? productRepository.findByShopId(shopId)
+                : productRepository.findByShopIdAndActiveTrue(shopId);
 
-        // Return only active products for customer storefront
-        List<Product> products = productRepository.findByShopIdAndActiveTrue(shopId);
         return mapProductsWithStock(products);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductResponse> getProductsForShop(Long shopId, String callerEmail) {
+        return getProductsForShop(shopId, callerEmail, false);
     }
 
     /**
@@ -271,6 +278,9 @@ public class ProductService {
         if (request.imageUrl() != null) {
             product.setImageUrl(request.imageUrl().trim());
         }
+        if (request.imagePublicId() != null) {
+            product.setImagePublicId(request.imagePublicId().trim());
+        }
         if (request.active() != null) {
             product.setActive(request.active());
         }
@@ -307,6 +317,11 @@ public class ProductService {
 
         product.setActive(false);
         productRepository.save(product);
+
+        inventoryRepository.findByProductId(product.getId()).ifPresent(inv -> {
+            inv.setAvailable(false);
+            inventoryRepository.save(inv);
+        });
     }
 
     /**
@@ -417,6 +432,9 @@ public class ProductService {
         if (request.imageUrl() != null) {
             product.setImageUrl(request.imageUrl().trim());
         }
+        if (request.imagePublicId() != null) {
+            product.setImagePublicId(request.imagePublicId().trim());
+        }
         product.setShop(shop);
         product.setCategory(category);
         product.setActive(true);
@@ -469,6 +487,9 @@ public class ProductService {
         if (request.imageUrl() != null) {
             product.setImageUrl(request.imageUrl().trim());
         }
+        if (request.imagePublicId() != null) {
+            product.setImagePublicId(request.imagePublicId().trim());
+        }
         if (request.active() != null) {
             product.setActive(request.active());
         }
@@ -498,6 +519,11 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
         product.setActive(false);
         productRepository.save(product);
+
+        inventoryRepository.findByProductId(product.getId()).ifPresent(inv -> {
+            inv.setAvailable(false);
+            inventoryRepository.save(inv);
+        });
     }
 
     // ==========================================

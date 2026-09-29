@@ -65,7 +65,11 @@ public class Inventory {
         this.updatedAt = LocalDateTime.now();
         if (this.quantity == null) this.quantity = 0;
         if (this.lowStockThreshold == null) this.lowStockThreshold = 5;
-        this.available = (this.quantity > 0);
+        if (this.available == null) {
+            this.available = (this.quantity > 0);
+        } else if (this.quantity <= 0) {
+            this.available = false;
+        }
     }
 
     public Long getId() {

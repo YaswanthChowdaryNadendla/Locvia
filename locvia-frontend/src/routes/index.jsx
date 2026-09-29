@@ -576,23 +576,11 @@ const AppRoutes = () => {
 
         <Route
           path="/shop-owner/inventory"
-          element={
-            <ShopOwnerProtectedRoute>
-              <ShopOwnerLayout>
-                <ShopOwnerInventoryPage />
-              </ShopOwnerLayout>
-            </ShopOwnerProtectedRoute>
-          }
+          element={<Navigate to="/shop-owner/products" replace />}
         />
         <Route
           path="/shop/inventory"
-          element={
-            <ShopOwnerProtectedRoute>
-              <ShopOwnerLayout>
-                <ShopOwnerInventoryPage />
-              </ShopOwnerLayout>
-            </ShopOwnerProtectedRoute>
-          }
+          element={<Navigate to="/shop-owner/products" replace />}
         />
 
         <Route

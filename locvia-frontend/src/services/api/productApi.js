@@ -101,6 +101,17 @@ export const updateProduct = async (id, productData) => {
 };
 
 /**
+ * Updates stock quantity for a product.
+ * PUT /api/products/{id}
+ * @param {number|string} id
+ * @param {number} stock
+ * @returns {Promise<Object>} Updated product
+ */
+export const updateProductStock = async (id, stock) => {
+  return updateProduct(id, { stock, stockQuantity: stock, isAvailable: stock > 0 });
+};
+
+/**
  * Deletes a product.
  * DELETE /api/products/{id}
  * @param {number|string} id
@@ -152,6 +163,7 @@ export default {
   getRelatedProducts,
   createProduct,
   updateProduct,
+  updateProductStock,
   deleteProduct,
   uploadProductImage,
   uploadImage,

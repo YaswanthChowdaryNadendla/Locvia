@@ -748,4 +748,34 @@ test('Integration Suite - Module 65', async (t) => {
     assert.ok(!adminShopsSrc.includes('<Plus size={18} />\n          Add Shop'));
     assert.ok(!adminShopsSrc.includes('showAddShopModal'));
   });
+
+  await t.test('54. Shop Owner navigation consolidates inventory: sidebar does NOT have Inventory link', () => {
+    const layoutSrc = fs.readFileSync(path.resolve(__dirname, '../layouts/ShopOwnerLayout.jsx'), 'utf8');
+    assert.ok(!layoutSrc.includes("to: '/shop-owner/inventory'"));
+    assert.ok(layoutSrc.includes("to: '/shop-owner/products'"));
+    assert.ok(layoutSrc.includes("to: '/shop-owner/orders'"));
+    assert.ok(layoutSrc.includes("to: '/shop-owner/reviews'"));
+    assert.ok(layoutSrc.includes("to: '/shop-owner/shop-profile'"));
+  });
+
+  await t.test('55. /shop-owner/inventory and /shop/inventory redirect to /shop-owner/products', () => {
+    const routesSrc = fs.readFileSync(path.resolve(__dirname, '../routes/index.jsx'), 'utf8');
+    assert.ok(routesSrc.includes('path="/shop-owner/inventory"'));
+    assert.ok(routesSrc.includes('<Navigate to="/shop-owner/products" replace />'));
+    assert.ok(routesSrc.includes('path="/shop/inventory"'));
+  });
+
+  await t.test('56. Shop Owner Products page includes inline stock adjustment and stock status', () => {
+    const productsSrc = fs.readFileSync(path.resolve(__dirname, '../pages/shop-owner/ShopOwnerProductsPage.jsx'), 'utf8');
+    assert.ok(productsSrc.includes('handleIncrement'));
+    assert.ok(productsSrc.includes('handleDecrement'));
+    assert.ok(productsSrc.includes('handleStockChange'));
+    assert.ok(productsSrc.includes('handleSaveInlineStock'));
+    assert.ok(productsSrc.includes('openStockModal'));
+    assert.ok(productsSrc.includes('Stock Quantity'));
+    assert.ok(productsSrc.includes('Stock Status'));
+    assert.ok(productsSrc.includes('In Stock'));
+    assert.ok(productsSrc.includes('Low Stock'));
+    assert.ok(productsSrc.includes('Out of Stock'));
+  });
 });

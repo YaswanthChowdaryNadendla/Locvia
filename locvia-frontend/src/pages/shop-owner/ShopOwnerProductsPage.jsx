@@ -18,13 +18,17 @@ import ButtonLoader from '../../components/common/loaders/ButtonLoader';
 import EmptyState from '../../components/common/EmptyState';
 import {
   Plus,
+  Minus,
   Search,
   Edit2,
+  Edit3,
   Trash2,
   Package,
   AlertTriangle,
   CheckCircle,
   X,
+  Save,
+  RefreshCw,
 } from 'lucide-react';
 
 const UNITS = ['1 kg', '500 g', '250 g', '1 Litre', '500 ml', '1 Pack', '1 Piece', '1 Dozen'];
@@ -34,9 +38,19 @@ export default function ShopOwnerProductsPage() {
   const [ownerShop, setOwnerShop] = useState(null);
 
   const [products, setProducts] = useState([]);
+  const [stockEdits, setStockEdits] = useState({});
+  const [savingId, setSavingId] = useState(null);
+
+  // Quick Stock Adjustment Modal State
+  const [modalProduct, setModalProduct] = useState(null);
+  const [modalMode, setModalMode] = useState('SET'); // 'SET' | 'ADD' | 'REMOVE'
+  const [modalAmount, setModalAmount] = useState('');
+  const [modalError, setModalError] = useState('');
+  const [isApplyingModal, setIsApplyingModal] = useState(false);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'INACTIVE' | 'LOW_STOCK' | 'OUT_OF_STOCK'
+  const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
 
   // Backend product categories
   const [categories, setCategories] = useState([]);
@@ -59,7 +73,7 @@ export default function ShopOwnerProductsPage() {
     price: '',
     mrp: '',
     unit: '1 kg',
-    stock: 25,
+    stock: 20,
     description: '',
     imageUrl: '',
     imagePublicId: '',
@@ -120,7 +134,14 @@ export default function ShopOwnerProductsPage() {
       try {
         setLoading(true);
         const data = await getOwnerProducts(shopId);
-        setProducts(Array.isArray(data) ? data : []);
+        const safeData = Array.isArray(data) ? data : [];
+        setProducts(safeData);
+        // Initialize stock edits buffer
+        const buffer = {};
+        safeData.forEach((p) => {
+          buffer[p.id] = p.stockQuantity !== undefined ? p.stockQuantity : (p.stock !== undefined ? p.stock : 0);
+        });
+        setStockEdits(buffer);
       } catch {
         setProducts([]);
       } finally {
@@ -136,8 +157,130 @@ export default function ShopOwnerProductsPage() {
     setTimeout(() => setNotification(null), 3500);
   };
 
+  // Inline Quick Stock Handlers
+  const handleStockChange = (productId, newVal) => {
+    const parsed = Math.max(0, parseInt(newVal, 10) || 0);
+    setStockEdits((prev) => ({
+      ...prev,
+      [productId]: parsed,
+    }));
+  };
+
+  const handleIncrement = (productId) => {
+    const p = products.find((prod) => prod.id === productId);
+    const defaultStock = p ? (p.stockQuantity !== undefined ? p.stockQuantity : (p.stock || 0)) : 0;
+    const current = stockEdits[productId] !== undefined ? stockEdits[productId] : defaultStock;
+    setStockEdits((prev) => ({
+      ...prev,
+      [productId]: current + 1,
+    }));
+  };
+
+  const handleDecrement = (productId) => {
+    const p = products.find((prod) => prod.id === productId);
+    const defaultStock = p ? (p.stockQuantity !== undefined ? p.stockQuantity : (p.stock || 0)) : 0;
+    const current = stockEdits[productId] !== undefined ? stockEdits[productId] : defaultStock;
+    if (current > 0) {
+      setStockEdits((prev) => ({
+        ...prev,
+        [productId]: current - 1,
+      }));
+    }
+  };
+
+  const handleSaveInlineStock = async (product) => {
+    const newStock = stockEdits[product.id];
+    if (newStock === undefined || savingId === product.id) return;
+    if (!ownerShop?.id) {
+      showToast('No active shop found for this account.', 'error');
+      return;
+    }
+    setSavingId(product.id);
+    try {
+      await updateOwnerProduct(ownerShop.id, product.id, {
+        stock: newStock,
+        stockQuantity: newStock,
+        isAvailable: newStock > 0,
+      });
+      await loadProducts(ownerShop.id);
+      showToast(`Updated stock for "${product.name}" to ${newStock} units.`);
+    } catch (err) {
+      showToast(err.message || 'Failed to update stock.', 'error');
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  // Stock Adjustment Modal Handlers
+  const openStockModal = (product) => {
+    setModalProduct(product);
+    setModalMode('SET');
+    const initStock = product.stockQuantity !== undefined ? product.stockQuantity : (product.stock || 0);
+    setModalAmount(String(initStock));
+    setModalError('');
+  };
+
+  const closeStockModal = () => {
+    setModalProduct(null);
+    setModalAmount('');
+    setModalError('');
+  };
+
+  const handleApplyModalStock = async () => {
+    if (!modalProduct || isApplyingModal) return;
+    if (!ownerShop?.id) {
+      setModalError('No active shop found for this account.');
+      return;
+    }
+    setModalError('');
+
+    const val = parseInt(modalAmount, 10);
+    if (isNaN(val) || val < 0) {
+      setModalError('Please enter a valid non-negative integer.');
+      return;
+    }
+
+    const currentStock = modalProduct.stockQuantity !== undefined ? modalProduct.stockQuantity : (modalProduct.stock || 0);
+    let finalStock = currentStock;
+    if (modalMode === 'SET') {
+      finalStock = val;
+    } else if (modalMode === 'ADD') {
+      finalStock += val;
+    } else if (modalMode === 'REMOVE') {
+      if (val > currentStock) {
+        setModalError(`Cannot remove ${val} units. Current stock is only ${currentStock}.`);
+        return;
+      }
+      finalStock -= val;
+    }
+
+    setIsApplyingModal(true);
+    try {
+      await updateOwnerProduct(ownerShop.id, modalProduct.id, {
+        stock: finalStock,
+        stockQuantity: finalStock,
+        isAvailable: finalStock > 0,
+      });
+      await loadProducts(ownerShop.id);
+      showToast(`Updated "${modalProduct.name}" stock to ${finalStock} units.`);
+      closeStockModal();
+    } catch (err) {
+      setModalError(err.message || 'Failed to update stock.');
+    } finally {
+      setIsApplyingModal(false);
+    }
+  };
+
+  // Stats calculation (active/non-deleted products only)
+  const productList = Array.isArray(products) ? products.filter((p) => p.active !== false) : [];
+  const totalCount = productList.length;
+  const getProductStock = (p) => p.stockQuantity !== undefined ? p.stockQuantity : (p.stock || 0);
+  const activeCount = productList.filter((p) => p.isAvailable !== false && getProductStock(p) > 0).length;
+  const lowStockCount = productList.filter((p) => getProductStock(p) > 0 && getProductStock(p) <= 10).length;
+  const outOfStockCount = productList.filter((p) => getProductStock(p) === 0).length;
+
   // Filtered Products
-  const filteredProducts = (products || []).filter((p) => {
+  const filteredProducts = productList.filter((p) => {
     const productCategory = p.categoryName || p.category || '';
     const matchesSearch =
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -149,8 +292,7 @@ export default function ShopOwnerProductsPage() {
     let matchesStatus = true;
     const stockVal = p.stockQuantity !== undefined ? p.stockQuantity : (p.stock !== undefined ? p.stock : 0);
 
-    if (statusFilter === 'ACTIVE') matchesStatus = p.isAvailable !== false && stockVal > 0;
-    if (statusFilter === 'INACTIVE') matchesStatus = p.isAvailable === false || stockVal === 0;
+    if (statusFilter === 'IN_STOCK' || statusFilter === 'ACTIVE') matchesStatus = stockVal > 10;
     if (statusFilter === 'LOW_STOCK') matchesStatus = stockVal > 0 && stockVal <= 10;
     if (statusFilter === 'OUT_OF_STOCK') matchesStatus = stockVal === 0;
 
@@ -212,7 +354,7 @@ export default function ShopOwnerProductsPage() {
       price: '',
       mrp: '',
       unit: '1 kg',
-      stock: 25,
+      stock: 20,
       description: '',
       imageUrl: '',
       imagePublicId: '',
@@ -286,6 +428,7 @@ export default function ShopOwnerProductsPage() {
         category: formData.category,
         categoryId: Number(formData.categoryId),
         price,
+        discountPrice: mrp > price ? price : null,
         mrp,
         originalPrice: mrp,
         discount,
@@ -294,7 +437,7 @@ export default function ShopOwnerProductsPage() {
         stockQuantity: stockQuantity,
         imageUrl: formData.imageUrl,
         image: formData.imageUrl,
-        imagePublicId: formData.imagePublicId || `locvia/products/${ownerShop.id}/${Date.now()}`,
+        imagePublicId: formData.imagePublicId || '',
         isAvailable: formData.isAvailable && stockQuantity > 0,
       };
 
@@ -326,6 +469,8 @@ export default function ShopOwnerProductsPage() {
     setIsDeleting(true);
     try {
       await deleteOwnerProduct(ownerShop.id, deletingProduct.id);
+      // Immediately remove from local state
+      setProducts((prev) => (Array.isArray(prev) ? prev.filter((p) => p.id !== deletingProduct.id) : []));
       await loadProducts(ownerShop.id);
       setDeletingProduct(null);
       showToast(`Product "${deletingProduct.name}" deleted successfully.`);
@@ -335,14 +480,6 @@ export default function ShopOwnerProductsPage() {
       setIsDeleting(false);
     }
   };
-
-  // Stats calculation
-  const productList = Array.isArray(products) ? products : [];
-  const totalCount = productList.length;
-  const getProductStock = (p) => p.stockQuantity !== undefined ? p.stockQuantity : (p.stock || 0);
-  const activeCount = productList.filter((p) => p.isAvailable !== false && getProductStock(p) > 0).length;
-  const lowStockCount = productList.filter((p) => getProductStock(p) > 0 && getProductStock(p) <= 10).length;
-  const outOfStockCount = productList.filter((p) => getProductStock(p) === 0).length;
 
   return (
     <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto', padding: '1rem', boxSizing: 'border-box' }}>
@@ -446,10 +583,10 @@ export default function ShopOwnerProductsPage() {
             </div>
             <div>
               <span style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: 600, textTransform: 'uppercase' }}>
-                Active & In Stock
+                In Stock (&gt;10)
               </span>
               <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#059669' }}>
-                {activeCount}
+                {inStockCount}
               </div>
             </div>
           </div>
@@ -462,7 +599,7 @@ export default function ShopOwnerProductsPage() {
             </div>
             <div>
               <span style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: 600, textTransform: 'uppercase' }}>
-                Low Stock (≤10)
+                Low Stock (1-10)
               </span>
               <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#D97706' }}>
                 {lowStockCount}
@@ -562,10 +699,10 @@ export default function ShopOwnerProductsPage() {
 
           {/* Status Tabs */}
           {[
-            { id: 'ALL', label: 'All' },
-            { id: 'ACTIVE', label: 'Active' },
-            { id: 'LOW_STOCK', label: 'Low Stock' },
-            { id: 'OUT_OF_STOCK', label: 'Out of Stock' },
+            { id: 'ALL', label: 'All Products' },
+            { id: 'IN_STOCK', label: 'In Stock (>10)' },
+            { id: 'LOW_STOCK', label: 'Low Stock (1-10)' },
+            { id: 'OUT_OF_STOCK', label: 'Out of Stock (0)' },
           ].map((tab) => {
             const isActive = statusFilter === tab.id;
             return (
@@ -631,14 +768,16 @@ export default function ShopOwnerProductsPage() {
                   <th style={thStyle}>Category</th>
                   <th style={thStyle}>Price / MRP</th>
                   <th style={thStyle}>Unit</th>
-                  <th style={thStyle}>Stock</th>
-                  <th style={thStyle}>Status</th>
+                  <th style={thStyle}>Stock Quantity</th>
+                  <th style={thStyle}>Stock Status</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredProducts.map((product) => {
                   const effectiveStock = product.stockQuantity !== undefined ? product.stockQuantity : (product.stock !== undefined ? product.stock : 0);
+                  const currentEditStock = stockEdits[product.id] !== undefined ? stockEdits[product.id] : effectiveStock;
+                  const isDirty = currentEditStock !== effectiveStock;
                   const isOut = effectiveStock === 0;
                   const isLow = effectiveStock > 0 && effectiveStock <= 10;
                   const mrpVal = product.mrp || product.originalPrice || product.price;
@@ -725,46 +864,147 @@ export default function ShopOwnerProductsPage() {
                         </span>
                       </td>
 
-                      {/* Stock */}
+                      {/* Stock Quantity */}
                       <td style={tdStyle}>
-                        <span
-                          style={{
-                            fontWeight: 800,
-                            color: isOut ? '#DC2626' : isLow ? '#D97706' : '#059669',
-                            fontSize: '0.9rem',
-                          }}
-                        >
-                          {effectiveStock}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              border: isDirty ? '1px solid var(--color-primary)' : '1px solid #D1D5DB',
+                              borderRadius: '8px',
+                              overflow: 'hidden',
+                              backgroundColor: '#FFFFFF',
+                              boxShadow: isDirty ? '0 0 0 1px var(--color-primary)' : 'none',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleDecrement(product.id)}
+                              style={{
+                                border: 'none',
+                                background: '#F9FAFB',
+                                padding: '6px 8px',
+                                cursor: 'pointer',
+                                color: '#4B5563',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRight: '1px solid #E5E7EB',
+                              }}
+                              title="Decrease Stock (-1)"
+                            >
+                              <Minus size={13} />
+                            </button>
+                            <input
+                              type="number"
+                              min="0"
+                              value={currentEditStock}
+                              onChange={(e) => handleStockChange(product.id, e.target.value)}
+                              style={{
+                                width: '56px',
+                                textAlign: 'center',
+                                border: 'none',
+                                outline: 'none',
+                                fontWeight: 700,
+                                fontSize: '0.875rem',
+                                color: isOut ? '#DC2626' : isLow ? '#D97706' : 'var(--color-text)',
+                                padding: '5px 2px',
+                                background: '#FFFFFF',
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleIncrement(product.id)}
+                              style={{
+                                border: 'none',
+                                background: '#F9FAFB',
+                                padding: '6px 8px',
+                                cursor: 'pointer',
+                                color: '#4B5563',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderLeft: '1px solid #E5E7EB',
+                              }}
+                              title="Increase Stock (+1)"
+                            >
+                              <Plus size={13} />
+                            </button>
+                          </div>
+
+                          {isDirty && (
+                            <button
+                              type="button"
+                              onClick={() => handleSaveInlineStock(product)}
+                              disabled={savingId === product.id}
+                              style={{
+                                padding: '6px 10px',
+                                borderRadius: '6px',
+                                border: 'none',
+                                backgroundColor: 'var(--color-primary)',
+                                color: '#FFFFFF',
+                                fontWeight: 700,
+                                fontSize: '0.78rem',
+                                cursor: savingId === product.id ? 'not-allowed' : 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                              }}
+                              title="Save Stock Update"
+                            >
+                              {savingId === product.id ? <ButtonLoader size="sm" color="white" /> : <Save size={12} />}
+                              <span>{savingId === product.id ? '...' : 'Save'}</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
 
-                      {/* Availability Status */}
+                      {/* Stock Status */}
                       <td style={tdStyle}>
                         {isOut ? (
                           <span style={badgeRedStyle}>Out of Stock</span>
                         ) : isLow ? (
                           <span style={badgeYellowStyle}>Low Stock</span>
                         ) : (
-                          <span style={badgeGreenStyle}>Active</span>
+                          <span style={badgeGreenStyle}>In Stock</span>
                         )}
                       </td>
 
                       {/* Action Buttons */}
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                          <button
+                            onClick={() => openStockModal(product)}
+                            title="Adjust Stock Quantity"
+                            style={{
+                              ...actionBtnStyle,
+                              backgroundColor: '#EFF6FF',
+                              borderColor: '#BFDBFE',
+                              color: '#1D4ED8',
+                              fontWeight: 600,
+                              fontSize: '0.78rem',
+                              gap: '4px',
+                            }}
+                          >
+                            <Edit3 size={14} color="#2563EB" />
+                            <span>Stock</span>
+                          </button>
                           <button
                             onClick={() => handleOpenEditModal(product)}
-                            title="Edit Product"
+                            title="Edit Product Details"
                             style={actionBtnStyle}
                           >
-                            <Edit2 size={16} color="#4B5563" />
+                            <Edit2 size={15} color="#4B5563" />
                           </button>
                           <button
                             onClick={() => setDeletingProduct(product)}
                             title="Delete Product"
                             style={{ ...actionBtnStyle, backgroundColor: '#FEE2E2', borderColor: '#FCA5A5' }}
                           >
-                            <Trash2 size={16} color="#DC2626" />
+                            <Trash2 size={15} color="#DC2626" />
                           </button>
                         </div>
                       </td>
@@ -1118,6 +1358,167 @@ export default function ShopOwnerProductsPage() {
                   <span>{isDeleting ? 'Deleting...' : 'Delete Product'}</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Stock Adjustment Modal */}
+      {modalProduct && (
+        <div style={modalOverlayStyle}>
+          <div style={{ ...modalContentStyle, maxWidth: '460px' }}>
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #E5E7EB', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <RefreshCw size={20} style={{ color: 'var(--color-primary)' }} />
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--color-text)' }}>
+                  Update Product Stock
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={closeStockModal}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Product Summary Box */}
+            <div
+              style={{
+                backgroundColor: '#F9FAFB',
+                padding: '12px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '1.25rem',
+                border: '1px solid #E5E7EB',
+              }}
+            >
+              <img
+                src={normalizeImageUrl(modalProduct.imageUrl || modalProduct.image, 'product')}
+                alt={modalProduct.name}
+                onError={(e) => handleImageError(e, 'product')}
+                style={{ width: '44px', height: '44px', borderRadius: '8px', objectFit: 'cover' }}
+              />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-text)' }}>
+                  {modalProduct.name}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#6B7280' }}>
+                  Current Stock: <strong style={{ color: 'var(--color-primary)' }}>{modalProduct.stockQuantity !== undefined ? modalProduct.stockQuantity : (modalProduct.stock || 0)} units</strong> ({modalProduct.unit || '1 kg'})
+                </div>
+              </div>
+            </div>
+
+            {/* Operation Selector */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem' }}>
+              {[
+                { id: 'SET', label: 'Set Exact' },
+                { id: 'ADD', label: '+ Add Stock' },
+                { id: 'REMOVE', label: '- Remove' },
+              ].map((op) => {
+                const isActive = modalMode === op.id;
+                return (
+                  <button
+                    key={op.id}
+                    type="button"
+                    onClick={() => {
+                      setModalMode(op.id);
+                      setModalError('');
+                      if (op.id === 'SET') {
+                        const s = modalProduct.stockQuantity !== undefined ? modalProduct.stockQuantity : (modalProduct.stock || 0);
+                        setModalAmount(String(s));
+                      } else {
+                        setModalAmount('');
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      border: isActive ? '1px solid var(--color-primary)' : '1px solid #D1D5DB',
+                      backgroundColor: isActive ? 'var(--color-primary)' : '#FFFFFF',
+                      color: isActive ? '#FFFFFF' : '#4B5563',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {op.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Amount Input */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={labelStyle}>
+                {modalMode === 'SET' && 'New Stock Quantity (Units) *'}
+                {modalMode === 'ADD' && 'Quantity to Add (Units) *'}
+                {modalMode === 'REMOVE' && 'Quantity to Remove (Units) *'}
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={modalAmount}
+                onChange={(e) => {
+                  setModalAmount(e.target.value);
+                  setModalError('');
+                }}
+                placeholder={modalMode === 'SET' ? 'e.g. 35' : 'e.g. 10'}
+                style={{
+                  ...inputStyle,
+                  borderColor: modalError ? '#EF4444' : '#D1D5DB',
+                }}
+              />
+              {modalError && <span style={errorTextStyle}>{modalError}</span>}
+            </div>
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={closeStockModal}
+                disabled={isApplyingModal}
+                style={{
+                  padding: '9px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #D1D5DB',
+                  backgroundColor: '#FFFFFF',
+                  color: '#4B5563',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  cursor: isApplyingModal ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyModalStock}
+                disabled={isApplyingModal || modalAmount === ''}
+                style={{
+                  padding: '9px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: 'var(--color-primary)',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: '0.875rem',
+                  cursor: (isApplyingModal || modalAmount === '') ? 'not-allowed' : 'pointer',
+                  opacity: (isApplyingModal || modalAmount === '') ? 0.7 : 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                {isApplyingModal && <ButtonLoader size="sm" color="white" />}
+                <span>{isApplyingModal ? 'Saving...' : 'Update Stock'}</span>
+              </button>
             </div>
           </div>
         </div>

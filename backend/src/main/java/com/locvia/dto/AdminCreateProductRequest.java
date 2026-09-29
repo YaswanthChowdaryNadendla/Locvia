@@ -41,6 +41,9 @@ public record AdminCreateProductRequest(
         @Size(max = 500, message = "Image URL must not exceed 500 characters")
         String imageUrl,
 
+        @Size(max = 255, message = "Image public ID must not exceed 255 characters")
+        String imagePublicId,
+
         @Min(value = 0, message = "Stock quantity cannot be negative")
         Integer stockQuantity,
 
@@ -56,6 +59,7 @@ public record AdminCreateProductRequest(
             @JsonProperty("discountPrice") BigDecimal discountPrice,
             @JsonProperty("unit") String unit,
             @JsonProperty("imageUrl") String imageUrl,
+            @JsonProperty("imagePublicId") String imagePublicId,
             @JsonProperty("stockQuantity") Integer stockQuantity,
             @JsonProperty("stock") Integer stock) {
         this.shopId = shopId;
@@ -66,16 +70,17 @@ public record AdminCreateProductRequest(
         this.discountPrice = discountPrice;
         this.unit = unit;
         this.imageUrl = imageUrl;
+        this.imagePublicId = imagePublicId;
         this.stockQuantity = stockQuantity != null ? stockQuantity : (stock != null ? stock : 0);
         this.stock = this.stockQuantity;
     }
 
     public AdminCreateProductRequest(Long shopId, Long categoryId, String name, String description, BigDecimal price, BigDecimal discountPrice, String unit, String imageUrl) {
-        this(shopId, categoryId, name, description, price, discountPrice, unit, imageUrl, 0, 0);
+        this(shopId, categoryId, name, description, price, discountPrice, unit, imageUrl, null, 0, 0);
     }
 
     public AdminCreateProductRequest(Long shopId, Long categoryId, String name, String description, BigDecimal price, BigDecimal discountPrice, String unit, String imageUrl, Integer stockQuantity) {
-        this(shopId, categoryId, name, description, price, discountPrice, unit, imageUrl, stockQuantity, stockQuantity);
+        this(shopId, categoryId, name, description, price, discountPrice, unit, imageUrl, null, stockQuantity, stockQuantity);
     }
 
     public Integer resolvedStock() {

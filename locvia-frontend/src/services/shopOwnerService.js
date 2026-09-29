@@ -93,6 +93,13 @@ export const updateOwnerProduct = async (_shopId, productId, updatedData) => {
 };
 
 /**
+ * Updates stock quantity for a product.
+ */
+export const updateOwnerProductStock = async (_shopId, productId, stock) => {
+  return productApi.updateProductStock(productId, stock);
+};
+
+/**
  * Deletes a product via the API.
  */
 export const deleteOwnerProduct = async (_shopId, productId) => {

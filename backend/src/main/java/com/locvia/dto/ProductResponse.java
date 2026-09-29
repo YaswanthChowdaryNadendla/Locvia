@@ -21,6 +21,7 @@ public record ProductResponse(
         BigDecimal price,
         BigDecimal discountPrice,
         String imageUrl,
+        String imagePublicId,
         String unit,
         Boolean active,
         Integer stockQuantity,
@@ -41,10 +42,30 @@ public record ProductResponse(
             String imageUrl,
             String unit,
             Boolean active,
+            Integer stockQuantity,
             LocalDateTime createdAt,
             LocalDateTime updatedAt
     ) {
-        this(id, shopId, shopName, categoryId, categoryName, name, description, price, discountPrice, imageUrl, unit, active, 0, createdAt, updatedAt);
+        this(id, shopId, shopName, categoryId, categoryName, name, description, price, discountPrice, imageUrl, null, unit, active, stockQuantity, createdAt, updatedAt);
+    }
+
+    public ProductResponse(
+            Long id,
+            Long shopId,
+            String shopName,
+            Long categoryId,
+            String categoryName,
+            String name,
+            String description,
+            BigDecimal price,
+            BigDecimal discountPrice,
+            String imageUrl,
+            String unit,
+            Boolean active,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt
+    ) {
+        this(id, shopId, shopName, categoryId, categoryName, name, description, price, discountPrice, imageUrl, null, unit, active, 0, createdAt, updatedAt);
     }
 
     @JsonProperty("stock")
@@ -55,6 +76,11 @@ public record ProductResponse(
     @JsonProperty("image")
     public String getImage() {
         return imageUrl;
+    }
+
+    @JsonProperty("category")
+    public String getCategory() {
+        return categoryName;
     }
 
     /**
@@ -99,6 +125,7 @@ public record ProductResponse(
                 product.getPrice(),
                 product.getDiscountPrice(),
                 product.getImageUrl(),
+                product.getImagePublicId(),
                 product.getUnit(),
                 product.getActive(),
                 effectiveStock,

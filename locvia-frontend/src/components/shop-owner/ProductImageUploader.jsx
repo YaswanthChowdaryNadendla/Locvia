@@ -58,8 +58,12 @@ export default function ProductImageUploader({
 
     try {
       const res = await uploadImage(file);
-      const secureUrl = res?.secure_url || res?.url || res?.imageUrl || objectUrl;
-      const uploadedPublicId = res?.public_id || publicId || `locvia/products/${shopId}/${productId || Date.now()}`;
+      const secureUrl = res?.secure_url || res?.url || res?.imageUrl;
+      const uploadedPublicId = res?.public_id || publicId || '';
+
+      if (!secureUrl) {
+        throw new Error('Image upload failed to return a secure URL.');
+      }
 
       setUploadProgress(100);
       setUploadState('success');

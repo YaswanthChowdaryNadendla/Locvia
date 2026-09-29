@@ -33,6 +33,9 @@ public record UpdateProductRequest(
         @Size(max = 500, message = "Image URL must not exceed 500 characters")
         String imageUrl,
 
+        @Size(max = 255, message = "Image public ID must not exceed 255 characters")
+        String imagePublicId,
+
         Boolean active,
 
         @Min(value = 0, message = "Stock quantity cannot be negative")
@@ -49,6 +52,7 @@ public record UpdateProductRequest(
             @JsonProperty("unit") String unit,
             @JsonProperty("categoryId") Long categoryId,
             @JsonProperty("imageUrl") String imageUrl,
+            @JsonProperty("imagePublicId") String imagePublicId,
             @JsonProperty("active") Boolean active,
             @JsonProperty("stockQuantity") Integer stockQuantity,
             @JsonProperty("stock") Integer stock) {
@@ -59,13 +63,18 @@ public record UpdateProductRequest(
         this.unit = unit;
         this.categoryId = categoryId;
         this.imageUrl = imageUrl;
+        this.imagePublicId = imagePublicId;
         this.active = active;
         this.stockQuantity = stockQuantity != null ? stockQuantity : stock;
         this.stock = this.stockQuantity;
     }
 
     public UpdateProductRequest(String name, String description, BigDecimal price, BigDecimal discountPrice, String unit, Long categoryId, String imageUrl, Boolean active) {
-        this(name, description, price, discountPrice, unit, categoryId, imageUrl, active, null, null);
+        this(name, description, price, discountPrice, unit, categoryId, imageUrl, null, active, null, null);
+    }
+
+    public UpdateProductRequest(String name, String description, BigDecimal price, BigDecimal discountPrice, String unit, Long categoryId, String imageUrl, Boolean active, Integer stockQuantity, Integer stock) {
+        this(name, description, price, discountPrice, unit, categoryId, imageUrl, null, active, stockQuantity, stock);
     }
 
     public Integer resolvedStock() {
