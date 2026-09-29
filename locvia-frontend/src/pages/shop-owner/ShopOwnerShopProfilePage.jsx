@@ -113,7 +113,7 @@ export default function ShopOwnerShopProfilePage() {
   const isFormDirty = JSON.stringify(formData) !== JSON.stringify(initialData);
 
   // Toggle Live Store Status (Synchronized with M19 Dashboard & AuthContext)
-  const handleToggleShopStatus = () => {
+  const handleToggleShopStatus = async () => {
     const newStatus = !formData.isOpen;
     setFormData((prev) => ({ ...prev, isOpen: newStatus }));
 
@@ -123,7 +123,9 @@ export default function ShopOwnerShopProfilePage() {
     }
 
     try {
-      updateShopDetails(ownerShop.id, { isOpen: newStatus });
+      if (ownerShop?.id) {
+        await updateShopDetails(ownerShop.id, { isOpen: newStatus });
+      }
       showToast(`Store is now ${newStatus ? 'OPEN for customer orders' : 'CLOSED'}.`);
     } catch {
       showToast('Failed to update shop status.', 'error');

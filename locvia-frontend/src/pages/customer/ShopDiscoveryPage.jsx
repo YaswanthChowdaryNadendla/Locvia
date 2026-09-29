@@ -40,6 +40,8 @@ const DiscoveryShopCard = ({ shop }) => {
     rating, deliveryTime, deliveryFee, isOpen, tags,
   } = shop;
 
+  const isShopOpen = isOpen !== undefined ? Boolean(isOpen) : (shop.active !== false && shop.status === 'APPROVED');
+
   return (
     <Link to={`/shops/${id}`} className="sd-shop-card" aria-label={`Open ${name}`}>
       {/* Image */}
@@ -56,14 +58,14 @@ const DiscoveryShopCard = ({ shop }) => {
         <span className="sd-card-cat-pill">{category}</span>
 
         {/* Closed overlay */}
-        {!isOpen && (
+        {!isShopOpen && (
           <div className="sd-card-closed-overlay">
             <span className="sd-closed-badge">Closed Now</span>
           </div>
         )}
 
         {/* Free delivery badge */}
-        {deliveryFee === 0 && isOpen && (
+        {deliveryFee === 0 && isShopOpen && (
           <span className="sd-card-free-pill">Free Delivery</span>
         )}
       </div>

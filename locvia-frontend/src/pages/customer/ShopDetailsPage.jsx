@@ -94,6 +94,8 @@ const ShopDetailsPage = () => {
     }
   };
 
+  const isShopOpen = shop?.isOpen !== undefined ? Boolean(shop.isOpen) : (shop?.active !== false && shop?.status === 'APPROVED');
+
   // Loading state with realistic skeletons matching shop header & products grid
   if (loading) {
     return (
@@ -204,7 +206,7 @@ const ShopDetailsPage = () => {
               className="sdp-header-img"
               loading="eager"
             />
-            {!shop.isOpen && (
+            {!isShopOpen && (
               <div className="sdp-closed-overlay">
                 <span>Closed Now</span>
               </div>
@@ -215,7 +217,7 @@ const ShopDetailsPage = () => {
           <div className="sdp-header-info">
             <div className="sdp-header-top">
               <span className="sdp-category-pill">{shop.category}</span>
-              {shop.isOpen ? (
+              {isShopOpen ? (
                 <span className="sdp-status-badge sdp-status-badge--open">
                   <span className="sdp-dot" /> Open Now
                 </span>
@@ -324,8 +326,8 @@ const ShopDetailsPage = () => {
                 <div
                   key={product.id}
                   style={{
-                    opacity: shop.isOpen ? 1 : 0.65,
-                    pointerEvents: shop.isOpen ? 'auto' : 'none'
+                    opacity: isShopOpen ? 1 : 0.65,
+                    pointerEvents: isShopOpen ? 'auto' : 'none'
                   }}
                 >
                   <ProductCard product={product} />

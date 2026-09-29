@@ -26,6 +26,8 @@ const ShopCard = ({ shop }) => {
     tags,
   } = shop;
 
+  const isShopOpen = isOpen !== undefined ? Boolean(isOpen) : (shop.active !== false && shop.status === 'APPROVED');
+
   return (
     <Link to={`/customer/shops/${id}`} className="lv-shop-card">
       {/* Shop Image Banner */}
@@ -39,7 +41,7 @@ const ShopCard = ({ shop }) => {
         />
 
         {/* Closed Overlay if not open */}
-        {!isOpen && (
+        {!isShopOpen && (
           <div className="lv-shop-closed-overlay">
             <span className="lv-shop-closed-pill">Closed Now</span>
           </div>

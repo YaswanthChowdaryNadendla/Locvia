@@ -31,6 +31,9 @@ public class UpdateShopRequest {
 
     private Double longitude;
 
+    @com.fasterxml.jackson.annotation.JsonProperty("isOpen")
+    private Boolean isOpen;
+
     public UpdateShopRequest() {
     }
 
@@ -107,5 +110,13 @@ public class UpdateShopRequest {
 
     public void setLongitude(Double longitude) {
         this.longitude = longitude;
+    }
+
+    public Boolean getIsOpen() {
+        return isOpen;
+    }
+
+    public void setIsOpen(Boolean isOpen) {
+        this.isOpen = isOpen;
     }
 }

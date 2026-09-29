@@ -83,6 +83,11 @@ public class OrderService {
                 throw new IllegalStateException("Product '" + (product != null ? product.getName() : "Unknown") + "' is no longer available.");
             }
 
+            Shop shop = product.getShop();
+            if (shop != null && Boolean.FALSE.equals(shop.getIsOpen())) {
+                throw new IllegalStateException("Shop '" + shop.getName() + "' is currently closed and not accepting orders.");
+            }
+
             Inventory inventory = inventoryRepository.findByProductId(product.getId())
                     .orElseThrow(() -> new IllegalStateException("Inventory not found for product '" + product.getName() + "'."));
 

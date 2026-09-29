@@ -35,6 +35,9 @@ public class AdminUpdateShopRequest {
 
     private Boolean active;
 
+    @com.fasterxml.jackson.annotation.JsonProperty("isOpen")
+    private Boolean isOpen;
+
     public AdminUpdateShopRequest() {
     }
 
@@ -129,5 +132,13 @@ public class AdminUpdateShopRequest {
 
     public void setActive(Boolean active) {
         this.active = active;
+    }
+
+    public Boolean getIsOpen() {
+        return isOpen;
+    }
+
+    public void setIsOpen(Boolean isOpen) {
+        this.isOpen = isOpen;
     }
 }

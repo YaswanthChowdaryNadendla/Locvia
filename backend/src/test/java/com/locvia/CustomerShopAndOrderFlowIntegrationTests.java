@@ -380,4 +380,75 @@ public class CustomerShopAndOrderFlowIntegrationTests {
                 .andExpect(jsonPath("$.orderId").value(orderId))
                 .andExpect(jsonPath("$.deliveryPartnerName").value("Delivery Driver"));
     }
+
+    @Test
+    @DisplayName("5. Shop Open/Closed Lifecycle: Owner toggles isOpen -> Customer sees isOpen -> Order allowed when open, blocked when closed")
+    void shopOpenClosedLifecycleFlow() throws Exception {
+        // Step 1: Verify Customer reading approved shop sees isOpen = true
+        mockMvc.perform(get("/api/shops/{id}", approvedShop.getId())
+                        .header("Authorization", "Bearer " + customerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(approvedShop.getId()))
+                .andExpect(jsonPath("$.isOpen").value(true));
+
+        // Step 2: Customer adds item to cart
+        CartItemRequest cartItemRequest = new CartItemRequest(testRice.getId(), 1);
+        mockMvc.perform(post("/api/cart/items")
+                        .header("Authorization", "Bearer " + customerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(cartItemRequest)))
+                .andExpect(status().isOk());
+
+        // Step 3: Shop Owner closes shop (isOpen = false)
+        UpdateShopRequest closeShopReq = new UpdateShopRequest();
+        closeShopReq.setIsOpen(false);
+
+        mockMvc.perform(put("/api/shops/{id}", approvedShop.getId())
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(closeShopReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isOpen").value(false));
+
+        // Step 4: Customer reading shop now sees isOpen = false
+        mockMvc.perform(get("/api/shops/{id}", approvedShop.getId())
+                        .header("Authorization", "Bearer " + customerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isOpen").value(false));
+
+        // Step 5: Customer attempting to place order while shop is closed fails (409 Conflict)
+        CreateOrderRequest orderRequest = new CreateOrderRequest(customerAddress.getId());
+        mockMvc.perform(post("/api/orders")
+                        .header("Authorization", "Bearer " + customerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(orderRequest)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("is currently closed and not accepting orders")));
+
+        // Step 6: Shop Owner re-opens shop (isOpen = true)
+        UpdateShopRequest openShopReq = new UpdateShopRequest();
+        openShopReq.setIsOpen(true);
+
+        mockMvc.perform(put("/api/shops/{id}", approvedShop.getId())
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(openShopReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isOpen").value(true));
+
+        // Step 7: Customer reading shop now sees isOpen = true
+        mockMvc.perform(get("/api/shops/{id}", approvedShop.getId())
+                        .header("Authorization", "Bearer " + customerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isOpen").value(true));
+
+        // Step 8: Customer places order now successfully
+        mockMvc.perform(post("/api/orders")
+                        .header("Authorization", "Bearer " + customerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(orderRequest)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.status").value("PENDING"));
+    }
 }

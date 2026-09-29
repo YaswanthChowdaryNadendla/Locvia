@@ -106,6 +106,7 @@ public class ShopService {
         shop.setLongitude(request.getLongitude());
         shop.setActive(false);
         shop.setStatus(ShopStatus.PENDING);
+        shop.setIsOpen(request.getIsOpen() != null ? request.getIsOpen() : true);
         shop.setRating(0.0);
         shop.setOwner(owner);
 
@@ -198,6 +199,9 @@ public class ShopService {
         }
         if (request.getLongitude() != null) {
             shop.setLongitude(request.getLongitude());
+        }
+        if (request.getIsOpen() != null) {
+            shop.setIsOpen(request.getIsOpen());
         }
 
         Shop updated = shopRepository.save(shop);
@@ -296,6 +300,9 @@ public class ShopService {
         if (request.getActive() != null) {
             shop.setActive(request.getActive());
         }
+        if (request.getIsOpen() != null) {
+            shop.setIsOpen(request.getIsOpen());
+        }
 
         Shop updated = shopRepository.save(shop);
         return ShopResponse.fromEntity(updated);
@@ -314,6 +321,9 @@ public class ShopService {
                 .orElseThrow(() -> new ResourceNotFoundException("Shop not found with id: " + id));
         shop.setStatus(ShopStatus.APPROVED);
         shop.setActive(true);
+        if (shop.getIsOpen() == null) {
+            shop.setIsOpen(true);
+        }
         Shop updated = shopRepository.save(shop);
         return ShopResponse.fromEntity(updated);
     }

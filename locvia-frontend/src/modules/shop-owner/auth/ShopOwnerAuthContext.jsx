@@ -2,6 +2,7 @@
 // Decoupled state provider for Locvia Shop Owner UI state (open/closed toggle)
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { getOwnerShop, updateShopDetails } from '../../../services/shopOwnerService';
 
 const ShopOwnerAuthContext = createContext(null);
 const STORAGE_KEY = 'shopOwnerAuth';
@@ -21,10 +22,40 @@ export const ShopOwnerAuthProvider = ({ children }) => {
     return shopOwner?.isOpen ?? true;
   });
 
+  // Fetch true backend shop state on mount to sync open/closed status
+  useEffect(() => {
+    let isMounted = true;
+    getOwnerShop()
+      .then((shop) => {
+        if (!isMounted || !shop) return;
+        const open = shop.isOpen !== undefined ? Boolean(shop.isOpen) : true;
+        setShopOwner((current) => {
+          const updated = {
+            ...(current || {}),
+            id: shop.id,
+            name: shop.name,
+            isOpen: open,
+          };
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+          } catch (e) {}
+          return updated;
+        });
+        setIsShopOpen(open);
+      })
+      .catch((err) => {
+        console.warn('Could not sync owner shop in ShopOwnerAuthContext:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Sync shop open status when shopOwner changes
   useEffect(() => {
-    if (shopOwner) {
-      setIsShopOpen(shopOwner.isOpen ?? true);
+    if (shopOwner && shopOwner.isOpen !== undefined) {
+      setIsShopOpen(Boolean(shopOwner.isOpen));
     }
   }, [shopOwner]);
 
@@ -88,18 +119,30 @@ export const ShopOwnerAuthProvider = ({ children }) => {
     return registeredObj;
   }, []);
 
-  // Toggle Shop Open/Closed status
-  const toggleShopStatus = useCallback(() => {
+  // Toggle Shop Open/Closed status and persist to backend
+  const toggleShopStatus = useCallback(async () => {
+    let nextState;
     setIsShopOpen((prev) => {
-      const nextState = !prev;
+      nextState = !prev;
       setShopOwner((current) => {
         if (!current) return current;
         const updated = { ...current, isOpen: nextState };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        } catch (e) {}
         return updated;
       });
       return nextState;
     });
+
+    try {
+      const shop = await getOwnerShop();
+      if (shop?.id && nextState !== undefined) {
+        await updateShopDetails(shop.id, { isOpen: nextState });
+      }
+    } catch (err) {
+      console.error('Failed to sync shop status update to backend:', err);
+    }
   }, []);
 
   // Logout handler

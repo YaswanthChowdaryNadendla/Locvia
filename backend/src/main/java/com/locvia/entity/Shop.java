@@ -41,6 +41,9 @@ public class Shop {
     @Column(nullable = false)
     private Boolean active = true;
 
+    @Column(name = "is_open", nullable = false)
+    private Boolean isOpen = true;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private ShopStatus status = ShopStatus.PENDING;
@@ -74,6 +77,7 @@ public class Shop {
         this.updatedAt = LocalDateTime.now();
         if (this.status == null) this.status = ShopStatus.PENDING;
         if (this.active == null) this.active = (this.status == ShopStatus.APPROVED);
+        if (this.isOpen == null) this.isOpen = true;
         if (this.rating == null) this.rating = 0.0;
     }
 
@@ -168,6 +172,14 @@ public class Shop {
 
     public void setActive(Boolean active) {
         this.active = active;
+    }
+
+    public Boolean getIsOpen() {
+        return isOpen != null ? isOpen : true;
+    }
+
+    public void setIsOpen(Boolean isOpen) {
+        this.isOpen = isOpen;
     }
 
     public ShopStatus getStatus() {

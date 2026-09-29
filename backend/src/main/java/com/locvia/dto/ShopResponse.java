@@ -1,5 +1,6 @@
 package com.locvia.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.locvia.entity.Shop;
 import com.locvia.entity.ShopStatus;
 
@@ -21,6 +22,8 @@ public record ShopResponse(
         Double longitude,
         Double rating,
         Boolean active,
+        @JsonProperty("isOpen")
+        Boolean isOpen,
         String status,
         Long ownerId,
         UserSummaryDto owner,
@@ -50,6 +53,8 @@ public record ShopResponse(
         String statusStr = shop.getStatus() != null ? shop.getStatus().name()
                 : (Boolean.TRUE.equals(shop.getActive()) ? "APPROVED" : "PENDING");
 
+        Boolean open = shop.getIsOpen() != null ? shop.getIsOpen() : true;
+
         return new ShopResponse(
                 shop.getId(),
                 shop.getName(),
@@ -62,6 +67,7 @@ public record ShopResponse(
                 shop.getLongitude(),
                 shop.getRating(),
                 shop.getActive(),
+                open,
                 statusStr,
                 ownerId,
                 ownerSummary,

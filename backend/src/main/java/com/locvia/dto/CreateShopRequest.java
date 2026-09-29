@@ -34,6 +34,9 @@ public class CreateShopRequest {
 
     private Double longitude;
 
+    @com.fasterxml.jackson.annotation.JsonProperty("isOpen")
+    private Boolean isOpen = true;
+
     public CreateShopRequest() {
     }
 
@@ -110,5 +113,13 @@ public class CreateShopRequest {
 
     public void setLongitude(Double longitude) {
         this.longitude = longitude;
+    }
+
+    public Boolean getIsOpen() {
+        return isOpen != null ? isOpen : true;
+    }
+
+    public void setIsOpen(Boolean isOpen) {
+        this.isOpen = isOpen;
     }
 }
