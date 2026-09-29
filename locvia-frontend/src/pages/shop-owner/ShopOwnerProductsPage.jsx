@@ -273,10 +273,18 @@ export default function ShopOwnerProductsPage() {
 
   // Stats calculation (active/non-deleted products only)
   const productList = Array.isArray(products) ? products.filter((p) => p.active !== false) : [];
-  const totalCount = productList.length;
-  const getProductStock = (p) => p.stockQuantity !== undefined ? p.stockQuantity : (p.stock || 0);
-  const activeCount = productList.filter((p) => p.isAvailable !== false && getProductStock(p) > 0).length;
-  const lowStockCount = productList.filter((p) => getProductStock(p) > 0 && getProductStock(p) <= 10).length;
+  const totalProducts = productList.length;
+  const totalCount = totalProducts;
+  const getProductStock = (p) => {
+    if (!p) return 0;
+    if (typeof p.stockQuantity === 'number') return p.stockQuantity;
+    if (typeof p.stock === 'number') return p.stock;
+    const parsed = parseInt(p.stockQuantity ?? p.stock, 10);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+  const inStockCount = productList.filter((p) => getProductStock(p) > 10).length;
+  const activeCount = inStockCount;
+  const lowStockCount = productList.filter((p) => getProductStock(p) >= 1 && getProductStock(p) <= 10).length;
   const outOfStockCount = productList.filter((p) => getProductStock(p) === 0).length;
 
   // Filtered Products
@@ -290,10 +298,10 @@ export default function ShopOwnerProductsPage() {
       selectedCategory === 'All' || productCategory.toLowerCase() === selectedCategory.toLowerCase();
 
     let matchesStatus = true;
-    const stockVal = p.stockQuantity !== undefined ? p.stockQuantity : (p.stock !== undefined ? p.stock : 0);
+    const stockVal = getProductStock(p);
 
     if (statusFilter === 'IN_STOCK' || statusFilter === 'ACTIVE') matchesStatus = stockVal > 10;
-    if (statusFilter === 'LOW_STOCK') matchesStatus = stockVal > 0 && stockVal <= 10;
+    if (statusFilter === 'LOW_STOCK') matchesStatus = stockVal >= 1 && stockVal <= 10;
     if (statusFilter === 'OUT_OF_STOCK') matchesStatus = stockVal === 0;
 
     return matchesSearch && matchesCategory && matchesStatus;
