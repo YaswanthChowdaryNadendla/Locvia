@@ -74,6 +74,9 @@ public class ReviewIntegrationTests {
     private OrderRepository orderRepository;
 
     @Autowired
+    private InventoryRepository inventoryRepository;
+
+    @Autowired
     private ProductRepository productRepository;
 
     @Autowired
@@ -146,6 +149,7 @@ public class ReviewIntegrationTests {
         reviewRepository.deleteAll();
         orderItemRepository.deleteAll();
         orderRepository.deleteAll();
+        inventoryRepository.deleteAll();
         productRepository.deleteAll();
         shopRepository.deleteAll();
         categoryRepository.deleteAll();

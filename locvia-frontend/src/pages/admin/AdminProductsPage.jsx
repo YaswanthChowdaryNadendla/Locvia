@@ -13,6 +13,7 @@ import {
   Filter,
   ArrowUpDown,
   Eye,
+  Trash2,
   X,
   ChevronLeft,
   ChevronRight,
@@ -21,6 +22,7 @@ import {
 import {
   getAllProducts,
   updateProductStatus,
+  deleteProduct,
   calculateProductStats,
   getProductInitials,
 } from '../../services/adminProductService';
@@ -38,6 +40,7 @@ const AdminProductsPage = () => {
   const [categoriesList, setCategoriesList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,6 +54,7 @@ const AdminProductsPage = () => {
   // Modals & Toast State
   const [selectedProductForDetails, setSelectedProductForDetails] = useState(null);
   const [productToToggleStatus, setProductToToggleStatus] = useState(null);
+  const [productToDelete, setProductToDelete] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
   // Load data on mount
@@ -194,9 +198,25 @@ const AdminProductsPage = () => {
       setToastMessage(`Product "${productToToggleStatus.name}" ${actionText} successfully.`);
       setProductToToggleStatus(null);
     } catch (err) {
-      setToastMessage(err.message || 'Failed to update product status.');
+      setToastMessage(err.response?.data?.message || err.message || 'Failed to update product status.');
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  // Product deletion handler
+  const handleConfirmDelete = async () => {
+    if (!productToDelete || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      const updated = await deleteProduct(productToDelete.id);
+      setProductsList(Array.isArray(updated) ? updated : []);
+      setToastMessage(`Product "${productToDelete.name}" deleted successfully.`);
+      setProductToDelete(null);
+    } catch (err) {
+      setToastMessage(err.response?.data?.message || err.message || 'Failed to delete product.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -916,6 +936,27 @@ const AdminProductsPage = () => {
                           >
                             {isActive ? 'Deactivate' : 'Activate'}
                           </button>
+
+                          <button
+                            onClick={() => setProductToDelete(p)}
+                            title="Delete Product"
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              border: '1px solid #FECACA',
+                              background: '#FEF2F2',
+                              color: '#DC2626',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <Trash2 size={13} />
+                            Delete
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1097,6 +1138,28 @@ const AdminProductsPage = () => {
                       }}
                     >
                       {isActive ? 'Deactivate' : 'Activate'}
+                    </button>
+
+                    <button
+                      onClick={() => setProductToDelete(p)}
+                      style={{
+                        flex: 1,
+                        padding: '8px',
+                        borderRadius: '6px',
+                        border: '1px solid #FECACA',
+                        background: '#FEF2F2',
+                        color: '#DC2626',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <Trash2 size={13} />
+                      Delete
                     </button>
                   </div>
                 </div>
@@ -1489,6 +1552,104 @@ const AdminProductsPage = () => {
                   <ButtonLoader size={16} color="#FFFFFF" text="Updating..." />
                 ) : (
                   productToToggleStatus.status === 'ACTIVE' ? 'Deactivate' : 'Activate'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Product Confirmation Modal */}
+      {productToDelete && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '16px',
+              maxWidth: '420px',
+              width: '100%',
+              padding: '24px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: '52px',
+                height: '52px',
+                borderRadius: '50%',
+                background: '#FEF2F2',
+                color: '#EF4444',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px auto',
+              }}
+            >
+              <Trash2 size={26} />
+            </div>
+
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: 700, color: '#0F172A' }}>
+              Delete Product
+            </h3>
+
+            <p style={{ fontSize: '14px', color: '#64748B', margin: '0 0 24px 0', lineHeight: 1.5 }}>
+              Are you sure you want to permanently delete <strong>{productToDelete.name}</strong>? This action cannot be undone.
+            </p>
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={() => setProductToDelete(null)}
+                disabled={isDeleting}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: '8px',
+                  border: '1px solid #CBD5E1',
+                  background: '#FFFFFF',
+                  color: '#334155',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: isDeleting ? '#94A3B8' : '#DC2626',
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {isDeleting ? (
+                  <ButtonLoader size={16} color="#FFFFFF" text="Deleting..." />
+                ) : (
+                  'Delete'
                 )}
               </button>
             </div>

@@ -97,7 +97,7 @@ export const updateProductStatus = async (productId, newStatus) => {
     if (isActivating) {
       await adminApi.updateProduct(productId, { active: true });
     } else {
-      await adminApi.deleteProduct(productId);
+      await adminApi.updateProduct(productId, { active: false });
     }
   } catch (err) {
     console.warn('adminApi product status update failed, syncing fallback:', err);
@@ -120,6 +120,27 @@ export const updateProductStatus = async (productId, newStatus) => {
     localStorage.setItem(PRODUCTS_KEY, JSON.stringify(updatedRaw));
   } catch (err) {
     console.error('Error updating product status in localStorage:', err);
+  }
+
+  return getAllProducts();
+};
+
+/**
+ * Permanently deletes a product via admin console.
+ */
+export const deleteProduct = async (productId) => {
+  await adminApi.deleteProduct(productId);
+
+  // Also sync localStorage fallback
+  const rawProducts = getStoredProducts();
+  const updatedRaw = (Array.isArray(rawProducts) ? rawProducts : []).filter(
+    (p) => String(p.id) !== String(productId)
+  );
+
+  try {
+    localStorage.setItem(PRODUCTS_KEY, JSON.stringify(updatedRaw));
+  } catch (err) {
+    console.error('Error removing product from localStorage:', err);
   }
 
   return getAllProducts();

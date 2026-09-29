@@ -835,4 +835,41 @@ test('Integration Suite - Module 65', async (t) => {
     assert.ok(pdpSrc.includes('reviewApi.updateReview'));
     assert.ok(pdpSrc.includes('reviewApi.deleteReview'));
   });
+
+  // ── Admin Product Delete Functionality ──
+
+  await t.test('63. ENDPOINTS.ADMIN.PRODUCT_BY_ID maps to /admin/products/:id for delete operation', () => {
+    assert.equal(ENDPOINTS.ADMIN.PRODUCT_BY_ID(42), '/admin/products/42');
+  });
+
+  await t.test('64. adminProductService exports deleteProduct and updateProductStatus uses PUT for deactivation', () => {
+    const serviceSrc = fs.readFileSync(path.resolve(__dirname, '../services/adminProductService.js'), 'utf8');
+    assert.ok(serviceSrc.includes("export const deleteProduct = async (productId)"));
+    assert.ok(serviceSrc.includes("export const updateProductStatus = async (productId, newStatus)"));
+    // Verify deactivation calls updateProduct({ active: false }) instead of deleting
+    assert.ok(serviceSrc.includes("adminApi.updateProduct(productId, { active: false })"));
+    // Verify deleteProduct calls adminApi.deleteProduct
+    assert.ok(serviceSrc.includes("adminApi.deleteProduct(productId)"));
+
+    const apiSrc = fs.readFileSync(path.resolve(__dirname, '../services/api/adminApi.js'), 'utf8');
+    assert.ok(apiSrc.includes("export const deleteProduct = async (id)"));
+    assert.ok(apiSrc.includes("axiosClient.delete(ENDPOINTS.ADMIN.PRODUCT_BY_ID(id))"));
+  });
+
+  await t.test('65. AdminProductsPage renders Delete button with Trash2 icon in table and mobile views', () => {
+    const adminProductsSrc = fs.readFileSync(path.resolve(__dirname, '../pages/admin/AdminProductsPage.jsx'), 'utf8');
+    assert.ok(adminProductsSrc.includes('Trash2'));
+    assert.ok(adminProductsSrc.includes('setProductToDelete(p)'));
+    assert.ok(adminProductsSrc.includes('Delete'));
+    assert.ok(adminProductsSrc.includes('deleteProduct'));
+  });
+
+  await t.test('66. AdminProductsPage renders Delete confirmation modal with required warning text and Cancel/Delete buttons', () => {
+    const adminProductsSrc = fs.readFileSync(path.resolve(__dirname, '../pages/admin/AdminProductsPage.jsx'), 'utf8');
+    assert.ok(adminProductsSrc.includes('productToDelete'));
+    assert.ok(adminProductsSrc.includes('Delete Product'));
+    assert.ok(adminProductsSrc.includes('Are you sure you want to permanently delete'));
+    assert.ok(adminProductsSrc.includes('This action cannot be undone.'));
+    assert.ok(adminProductsSrc.includes('handleConfirmDelete'));
+  });
 });

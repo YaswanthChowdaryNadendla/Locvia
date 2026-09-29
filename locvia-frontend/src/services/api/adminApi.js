@@ -128,7 +128,7 @@ export const updateProduct = async (id, data) => {
 };
 
 /**
- * Deactivates a product via admin console.
+ * Permanently deletes a product via admin console.
  * DELETE /api/admin/products/{id}
  * @param {string|number} id
  * @returns {Promise<Object>}

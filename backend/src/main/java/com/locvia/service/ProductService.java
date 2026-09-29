@@ -4,17 +4,23 @@ import com.locvia.dto.AdminCreateProductRequest;
 import com.locvia.dto.CreateProductRequest;
 import com.locvia.dto.ProductResponse;
 import com.locvia.dto.UpdateProductRequest;
+import com.locvia.entity.CartItem;
 import com.locvia.entity.Category;
 import com.locvia.entity.Inventory;
+import com.locvia.entity.OrderItem;
 import com.locvia.entity.Product;
+import com.locvia.entity.Review;
 import com.locvia.entity.Shop;
 import com.locvia.entity.ShopStatus;
 import com.locvia.entity.User;
 import com.locvia.entity.UserRole;
 import com.locvia.exception.ResourceNotFoundException;
+import com.locvia.repository.CartItemRepository;
 import com.locvia.repository.CategoryRepository;
 import com.locvia.repository.InventoryRepository;
+import com.locvia.repository.OrderItemRepository;
 import com.locvia.repository.ProductRepository;
+import com.locvia.repository.ReviewRepository;
 import com.locvia.repository.ShopRepository;
 import com.locvia.repository.UserRepository;
 import org.springframework.security.access.AccessDeniedException;
@@ -40,6 +46,9 @@ public class ProductService {
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
     private final InventoryRepository inventoryRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final ReviewRepository reviewRepository;
+    private final CartItemRepository cartItemRepository;
     private final CloudinaryService cloudinaryService;
 
     public ProductService(
@@ -48,12 +57,18 @@ public class ProductService {
             CategoryRepository categoryRepository,
             UserRepository userRepository,
             InventoryRepository inventoryRepository,
+            OrderItemRepository orderItemRepository,
+            ReviewRepository reviewRepository,
+            CartItemRepository cartItemRepository,
             CloudinaryService cloudinaryService) {
         this.productRepository = productRepository;
         this.shopRepository = shopRepository;
         this.categoryRepository = categoryRepository;
         this.userRepository = userRepository;
         this.inventoryRepository = inventoryRepository;
+        this.orderItemRepository = orderItemRepository;
+        this.reviewRepository = reviewRepository;
+        this.cartItemRepository = cartItemRepository;
         this.cloudinaryService = cloudinaryService;
     }
 
@@ -492,6 +507,17 @@ public class ProductService {
         }
         if (request.active() != null) {
             product.setActive(request.active());
+            if (!request.active()) {
+                inventoryRepository.findByProductId(product.getId()).ifPresent(inv -> {
+                    inv.setAvailable(false);
+                    inventoryRepository.save(inv);
+                });
+            } else {
+                inventoryRepository.findByProductId(product.getId()).ifPresent(inv -> {
+                    inv.setAvailable(inv.getQuantity() != null && inv.getQuantity() > 0);
+                    inventoryRepository.save(inv);
+                });
+            }
         }
 
         if (request.resolvedStock() != null) {
@@ -524,6 +550,62 @@ public class ProductService {
             inv.setAvailable(false);
             inventoryRepository.save(inv);
         });
+    }
+
+    /**
+     * Permanently deletes any product across any shop for administrators.
+     * Safely decouples foreign key references:
+     * - Order items: nullifies product reference while preserving snapshot data (name, price, subtotal, etc.)
+     * - Reviews: deletes reviews for this product
+     * - Cart items: deletes active cart items for this product
+     * - Inventory: deletes inventory record
+     * - Cloudinary image: safely cleaned up if imagePublicId exists (does not block deletion if Cloudinary fails)
+     * - Product: permanently removed from database
+     *
+     * @param id product ID
+     */
+    @Transactional
+    public void deleteProductForAdmin(Long id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+
+        // 1. Decouple historical order items (preserves complete order history)
+        List<OrderItem> orderItems = orderItemRepository.findByProductId(product.getId());
+        for (OrderItem item : orderItems) {
+            item.setProduct(null);
+            orderItemRepository.save(item);
+        }
+
+        // 2. Delete reviews associated with this product
+        List<Review> reviews = reviewRepository.findByProductId(product.getId());
+        if (!reviews.isEmpty()) {
+            reviewRepository.deleteAll(reviews);
+        }
+
+        // 3. Delete active cart items referencing this product
+        List<CartItem> cartItems = cartItemRepository.findByProductId(product.getId());
+        if (!cartItems.isEmpty()) {
+            cartItemRepository.deleteAll(cartItems);
+        }
+
+        // 4. Delete inventory record
+        inventoryRepository.findByProductId(product.getId())
+                .ifPresent(inventoryRepository::delete);
+
+        // 5. Store imagePublicId before deleting product
+        String imagePublicId = product.getImagePublicId();
+
+        // 6. Permanently delete the product record
+        productRepository.delete(product);
+
+        // 7. Safely clean up Cloudinary asset if present (does not abort deletion on failure)
+        if (imagePublicId != null && !imagePublicId.isBlank()) {
+            try {
+                cloudinaryService.deleteImage(imagePublicId);
+            } catch (Exception e) {
+                // Cloudinary cleanup failure is non-blocking
+            }
+        }
     }
 
     // ==========================================

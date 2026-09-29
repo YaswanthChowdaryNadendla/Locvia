@@ -89,15 +89,45 @@ public class AdminProductController {
     }
 
     /**
-     * Soft-deactivates any product (active = false).
+     * Updates product active status (activate/deactivate) for administrators.
+     * PUT /api/admin/products/{id}/status
+     *
+     * @param id   product ID
+     * @param body map containing "active" boolean or "status" string
+     * @return updated ProductResponse
+     */
+    @RequestMapping(value = "/{id}/status", method = {RequestMethod.PUT, RequestMethod.PATCH})
+    public ResponseEntity<ProductResponse> updateProductStatus(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+        Boolean active = null;
+        if (body.containsKey("active")) {
+            Object val = body.get("active");
+            if (val instanceof Boolean b) {
+                active = b;
+            } else if (val instanceof String s) {
+                active = Boolean.parseBoolean(s);
+            }
+        } else if (body.containsKey("status")) {
+            active = "ACTIVE".equalsIgnoreCase(String.valueOf(body.get("status")));
+        }
+        UpdateProductRequest req = new UpdateProductRequest(
+                null, null, null, null, null, null, null, null, active, null, null
+        );
+        ProductResponse response = productService.updateProductForAdmin(id, req);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Permanently deletes any product across any shop for administrators.
      * DELETE /api/admin/products/{id}
      *
      * @param id product ID
      * @return success confirmation
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, String>> deactivateProduct(@PathVariable Long id) {
-        productService.deactivateProductForAdmin(id);
-        return ResponseEntity.ok(Map.of("message", "Product deactivated successfully"));
+    public ResponseEntity<Map<String, String>> deleteProduct(@PathVariable Long id) {
+        productService.deleteProductForAdmin(id);
+        return ResponseEntity.ok(Map.of("message", "Product deleted successfully"));
     }
 }
