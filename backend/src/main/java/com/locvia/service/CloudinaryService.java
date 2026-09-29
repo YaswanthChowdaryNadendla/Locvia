@@ -43,14 +43,28 @@ public class CloudinaryService {
      * @return CloudinaryUploadResult containing secureUrl and publicId
      */
     public CloudinaryUploadResult uploadProductImage(MultipartFile file) {
+        return uploadImageToFolder(file, "locvia/products", "prod_");
+    }
+
+    /**
+     * Validates and uploads a shop image to Cloudinary under 'locvia/shops'.
+     *
+     * @param file uploaded multipart file
+     * @return CloudinaryUploadResult containing secureUrl and publicId
+     */
+    public CloudinaryUploadResult uploadShopImage(MultipartFile file) {
+        return uploadImageToFolder(file, "locvia/shops", "shop_");
+    }
+
+    private CloudinaryUploadResult uploadImageToFolder(MultipartFile file, String folder, String prefix) {
         validateImageFile(file);
 
         try {
-            String safePublicId = "prod_" + UUID.randomUUID().toString().replace("-", "");
+            String safePublicId = prefix + UUID.randomUUID().toString().replace("-", "");
 
             @SuppressWarnings("unchecked")
             Map<String, Object> uploadParams = ObjectUtils.asMap(
-                    "folder", "locvia/products",
+                    "folder", folder,
                     "public_id", safePublicId,
                     "overwrite", true,
                     "resource_type", "image"

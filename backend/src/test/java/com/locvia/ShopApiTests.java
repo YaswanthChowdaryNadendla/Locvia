@@ -9,6 +9,8 @@ import com.locvia.entity.Shop;
 import com.locvia.entity.ShopStatus;
 import com.locvia.entity.User;
 import com.locvia.entity.UserRole;
+import com.locvia.repository.InventoryRepository;
+import com.locvia.repository.ProductRepository;
 import com.locvia.repository.ShopRepository;
 import com.locvia.repository.UserRepository;
 import com.locvia.security.JwtService;
@@ -45,6 +47,12 @@ class ShopApiTests {
     private ShopRepository shopRepository;
 
     @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private InventoryRepository inventoryRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -78,7 +86,9 @@ class ShopApiTests {
 
     @BeforeEach
     void setUp() {
-        // Clear old test data
+        // Clear old test data in correct FK dependency order
+        inventoryRepository.deleteAll();
+        productRepository.deleteAll();
         shopRepository.deleteAll();
         userRepository.deleteAll();
 

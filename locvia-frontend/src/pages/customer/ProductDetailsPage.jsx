@@ -535,9 +535,9 @@ const ProductDetailsPage = () => {
               </div>
 
               <div className="pdp-shop-body">
-                {shop.image && (
+                {(shop.imageUrl || shop.image) && (
                   <img
-                    src={normalizeImageUrl(shop.image, 'shop')}
+                    src={normalizeImageUrl(shop.imageUrl || shop.image, 'shop')}
                     alt={shop.name}
                     onError={(e) => handleImageError(e, 'shop')}
                     className="pdp-shop-avatar"

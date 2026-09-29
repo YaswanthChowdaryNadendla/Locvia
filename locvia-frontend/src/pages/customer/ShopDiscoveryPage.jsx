@@ -36,7 +36,7 @@ const RatingBadge = ({ rating }) => (
 // ─── Shop Card ────────────────────────────────────────────────────────────────
 const DiscoveryShopCard = ({ shop }) => {
   const {
-    id, name, description, image, category, distance,
+    id, name, description, image, imageUrl, category, distance,
     rating, deliveryTime, deliveryFee, isOpen, tags,
   } = shop;
 
@@ -47,7 +47,7 @@ const DiscoveryShopCard = ({ shop }) => {
       {/* Image */}
       <div className="sd-card-img-wrap">
         <img
-          src={normalizeImageUrl(image, 'shop')}
+          src={normalizeImageUrl(imageUrl || image || shop.imageUrl || shop.image, 'shop')}
           alt={name}
           onError={(e) => handleImageError(e, 'shop')}
           loading="lazy"

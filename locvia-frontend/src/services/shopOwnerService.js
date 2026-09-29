@@ -55,6 +55,13 @@ export const updateShopDetails = async (shopId, updatedFields) => {
   return shopApi.updateMyShop(shopId, updatedFields);
 };
 
+/**
+ * Uploads a shop image via Cloudinary backend integration.
+ */
+export const uploadShopImage = async (shopId, file) => {
+  return shopApi.uploadShopImage(shopId, file);
+};
+
 // ── Products ──────────────────────────────────────────────────
 
 /**

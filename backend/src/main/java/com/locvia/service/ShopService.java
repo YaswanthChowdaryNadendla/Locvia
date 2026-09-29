@@ -10,6 +10,7 @@ import com.locvia.repository.*;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -27,6 +28,7 @@ public class ShopService {
     private final OrderItemRepository orderItemRepository;
     private final NotificationRepository notificationRepository;
     private final ReviewRepository reviewRepository;
+    private final CloudinaryService cloudinaryService;
 
     public ShopService(ShopRepository shopRepository,
                        UserRepository userRepository,
@@ -34,7 +36,8 @@ public class ShopService {
                        InventoryRepository inventoryRepository,
                        OrderItemRepository orderItemRepository,
                        NotificationRepository notificationRepository,
-                       ReviewRepository reviewRepository) {
+                       ReviewRepository reviewRepository,
+                       CloudinaryService cloudinaryService) {
         this.shopRepository = shopRepository;
         this.userRepository = userRepository;
         this.productRepository = productRepository;
@@ -42,6 +45,7 @@ public class ShopService {
         this.orderItemRepository = orderItemRepository;
         this.notificationRepository = notificationRepository;
         this.reviewRepository = reviewRepository;
+        this.cloudinaryService = cloudinaryService;
     }
 
     /**
@@ -384,6 +388,41 @@ public class ShopService {
     @Transactional
     public void deactivateShopForAdmin(Long id) {
         deleteShopForAdmin(id);
+    }
+
+    /**
+     * Uploads an image for a shop to Cloudinary and updates the shop's imageUrl.
+     * Enforces that the caller owns the shop or is an admin.
+     *
+     * @param shopId      target shop ID
+     * @param file        multipart image file
+     * @param callerEmail authenticated user email
+     * @return updated ShopResponse
+     */
+    @Transactional
+    public ShopResponse uploadShopImage(Long shopId, MultipartFile file, String callerEmail) {
+        User caller = findUserByEmail(callerEmail);
+        Shop shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shop not found with id: " + shopId));
+
+        if (caller.getRole() != UserRole.ADMIN && !shop.getOwner().getId().equals(caller.getId())) {
+            throw new AccessDeniedException("Access denied: You do not have permission to upload image for this shop");
+        }
+
+        CloudinaryService.CloudinaryUploadResult result = cloudinaryService.uploadShopImage(file);
+        shop.setImageUrl(result.secureUrl());
+        Shop saved = shopRepository.save(shop);
+        return ShopResponse.fromEntity(saved);
+    }
+
+    /**
+     * Standalone shop image upload to Cloudinary.
+     *
+     * @param file multipart image file
+     * @return CloudinaryUploadResult with secureUrl and publicId
+     */
+    public CloudinaryService.CloudinaryUploadResult uploadImage(MultipartFile file) {
+        return cloudinaryService.uploadShopImage(file);
     }
 
     private User findUserByEmail(String email) {

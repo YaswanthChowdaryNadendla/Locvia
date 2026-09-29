@@ -28,6 +28,7 @@ public class CreateShopRequest {
     private String email;
 
     @Size(max = 500, message = "Image URL must not exceed 500 characters")
+    @com.fasterxml.jackson.annotation.JsonAlias("image")
     private String imageUrl;
 
     private Double latitude;

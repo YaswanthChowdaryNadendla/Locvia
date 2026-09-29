@@ -18,6 +18,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import ButtonLoader from '../../components/common/loaders/ButtonLoader';
+import ShopImageUploader from '../../components/shop-owner/ShopImageUploader';
 
 const DAYS_OF_WEEK = [
   'Monday',
@@ -75,6 +76,7 @@ export default function ShopOwnerShopProfilePage() {
         setOwnerShop(shop);
         if (shop) {
           const parsedHours = shop.businessHours || DEFAULT_HOURS;
+          const shopImg = shop.imageUrl || shop.image || '';
           const loaded = {
             name: shop.name || '',
             description: shop.description || 'Fresh groceries and daily essentials delivered fast.',
@@ -86,7 +88,8 @@ export default function ShopOwnerShopProfilePage() {
             pincode: shop.pincode || '560034',
             isOpen: shop.isOpen !== undefined ? shop.isOpen : globalIsShopOpen,
             businessHours: parsedHours,
-            image: shop.image || 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&q=80&w=600&h=400',
+            image: shopImg,
+            imageUrl: shopImg,
           };
           setFormData(loaded);
           setInitialData(loaded);
@@ -200,7 +203,8 @@ export default function ShopOwnerShopProfilePage() {
         pincode: formData.pincode.trim(),
         isOpen: formData.isOpen,
         businessHours: formData.businessHours,
-        image: formData.image,
+        imageUrl: formData.image || formData.imageUrl,
+        image: formData.image || formData.imageUrl,
       });
 
       // Update shopOwnerAuth key for cross-component sync
@@ -584,6 +588,21 @@ export default function ShopOwnerShopProfilePage() {
                 <option value="Organic & Speciality">Organic & Speciality</option>
                 <option value="Supermarket">Supermarket</option>
               </select>
+            </div>
+
+            {/* Shop Storefront / Banner Image Uploader */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <ShopImageUploader
+                existingImageUrl={formData.image || formData.imageUrl}
+                shopId={ownerShop?.id}
+                onImageChange={({ imageUrl }) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    image: imageUrl,
+                    imageUrl: imageUrl,
+                  }));
+                }}
+              />
             </div>
 
           </div>

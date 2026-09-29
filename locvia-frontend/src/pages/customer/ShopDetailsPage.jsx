@@ -200,7 +200,7 @@ const ShopDetailsPage = () => {
           {/* Left: Shop Image */}
           <div className="sdp-header-img-wrap">
             <img
-              src={normalizeImageUrl(shop.image, 'shop')}
+              src={normalizeImageUrl(shop.imageUrl || shop.image, 'shop')}
               alt={shop.name}
               onError={(e) => handleImageError(e, 'shop')}
               className="sdp-header-img"

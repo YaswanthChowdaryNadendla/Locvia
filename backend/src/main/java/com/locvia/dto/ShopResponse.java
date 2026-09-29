@@ -31,6 +31,11 @@ public record ShopResponse(
         LocalDateTime updatedAt
 ) {
 
+    @JsonProperty("image")
+    public String getImage() {
+        return imageUrl;
+    }
+
     /**
      * Converts a Shop JPA entity into a clean, safe ShopResponse DTO.
      *

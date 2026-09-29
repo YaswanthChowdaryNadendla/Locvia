@@ -765,9 +765,9 @@ const AdminShopsPage = () => {
                       {/* Shop Image / Logo & Name */}
                       <td style={{ padding: '14px 18px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          {s.image ? (
+                          {(s.imageUrl || s.image) ? (
                             <img
-                              src={normalizeImageUrl(s.image, 'shop')}
+                              src={normalizeImageUrl(s.imageUrl || s.image, 'shop')}
                               alt={s.name}
                               onError={(e) => handleImageError(e, 'shop')}
                               style={{
@@ -1039,9 +1039,9 @@ const AdminShopsPage = () => {
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      {s.image ? (
+                      {(s.imageUrl || s.image) ? (
                         <img
-                          src={normalizeImageUrl(s.image, 'shop')}
+                          src={normalizeImageUrl(s.imageUrl || s.image, 'shop')}
                           alt={s.name}
                           onError={(e) => handleImageError(e, 'shop')}
                           style={{
@@ -1376,9 +1376,9 @@ const AdminShopsPage = () => {
                   borderBottom: '1px solid #F1F5F9',
                 }}
               >
-                {selectedShopForDetails.image ? (
+                {(selectedShopForDetails.imageUrl || selectedShopForDetails.image) ? (
                   <img
-                    src={normalizeImageUrl(selectedShopForDetails.image, 'shop')}
+                    src={normalizeImageUrl(selectedShopForDetails.imageUrl || selectedShopForDetails.image, 'shop')}
                     alt={selectedShopForDetails.name}
                     onError={(e) => handleImageError(e, 'shop')}
                     style={{

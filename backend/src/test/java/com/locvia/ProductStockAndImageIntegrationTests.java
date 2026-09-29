@@ -54,6 +54,15 @@ public class ProductStockAndImageIntegrationTests {
                 }
 
                 @Override
+                public CloudinaryUploadResult uploadShopImage(MultipartFile file) {
+                    validateImageFile(file);
+                    return new CloudinaryUploadResult(
+                            "https://res.cloudinary.com/locvia-cloud/image/upload/v1720000000/shops/test_shop.jpg",
+                            "locvia/shops/test_shop"
+                    );
+                }
+
+                @Override
                 public void deleteImage(String publicId) {
                     // no-op for tests
                 }
@@ -485,6 +494,82 @@ public class ProductStockAndImageIntegrationTests {
                         .header("Authorization", "Bearer " + otherOwnerToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(unauthorizedUpdate)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Shop Owner uploads shop image successfully via POST /api/shops/{id}/image")
+    void testUploadShopImage_success_updatesShopAndReturnsCloudinaryUrl() throws Exception {
+        MockMultipartFile imageFile = new MockMultipartFile(
+                "file",
+                "storefront.jpg",
+                "image/jpeg",
+                "test-shop-image-bytes".getBytes()
+        );
+
+        MvcResult result = mockMvc.perform(multipart("/api/shops/{id}/image", shop.getId())
+                        .file(imageFile)
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imageUrl", is("https://res.cloudinary.com/locvia-cloud/image/upload/v1720000000/shops/test_shop.jpg")))
+                .andExpect(jsonPath("$.image", is("https://res.cloudinary.com/locvia-cloud/image/upload/v1720000000/shops/test_shop.jpg")))
+                .andReturn();
+
+        // Verify shop database state
+        Shop updatedShop = shopRepository.findById(shop.getId()).orElseThrow();
+        assertThat(updatedShop.getImageUrl()).isEqualTo("https://res.cloudinary.com/locvia-cloud/image/upload/v1720000000/shops/test_shop.jpg");
+
+        // Verify public GET /api/shops/{id} returns the Cloudinary URL in both fields
+        mockMvc.perform(get("/api/shops/{id}", shop.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imageUrl", is("https://res.cloudinary.com/locvia-cloud/image/upload/v1720000000/shops/test_shop.jpg")))
+                .andExpect(jsonPath("$.image", is("https://res.cloudinary.com/locvia-cloud/image/upload/v1720000000/shops/test_shop.jpg")));
+    }
+
+    @Test
+    @DisplayName("Shop Owner standalone upload via POST /api/shops/upload-image")
+    void testStandaloneShopImageUpload_success() throws Exception {
+        MockMultipartFile imageFile = new MockMultipartFile(
+                "file",
+                "shop-banner.png",
+                "image/png",
+                "test-shop-banner-bytes".getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/shops/upload-image")
+                        .file(imageFile)
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.secure_url", is("https://res.cloudinary.com/locvia-cloud/image/upload/v1720000000/shops/test_shop.jpg")))
+                .andExpect(jsonPath("$.imageUrl", is("https://res.cloudinary.com/locvia-cloud/image/upload/v1720000000/shops/test_shop.jpg")))
+                .andExpect(jsonPath("$.public_id", is("locvia/shops/test_shop")));
+    }
+
+    @Test
+    @DisplayName("Unauthorized owner cannot upload image for another owner's shop")
+    void testUploadShopImage_unauthorizedOwner_returnsForbidden() throws Exception {
+        User otherOwner = new User(
+                "Another Owner",
+                "other_owner_shop_img@locvia.com",
+                "9876543299",
+                passwordEncoder.encode("Password@123"),
+                UserRole.SHOP_OWNER
+        );
+        otherOwner.setAccountStatus(AccountStatus.APPROVED);
+        otherOwner.setEmailVerified(true);
+        otherOwner = userRepository.save(otherOwner);
+        String otherOwnerToken = jwtService.generateToken(otherOwner.getEmail(), otherOwner.getId(), "ROLE_SHOP_OWNER");
+
+        MockMultipartFile imageFile = new MockMultipartFile(
+                "file",
+                "hacked.jpg",
+                "image/jpeg",
+                "malicious-bytes".getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/shops/{id}/image", shop.getId())
+                        .file(imageFile)
+                        .header("Authorization", "Bearer " + otherOwnerToken))
                 .andExpect(status().isForbidden());
     }
 }

@@ -74,6 +74,35 @@ export const createShop = async (shopData) => {
   return axiosClient.post(ENDPOINTS.SHOPS.BASE, shopData);
 };
 
+/**
+ * Uploads a shop image to Cloudinary and updates the shop's image URL.
+ * POST /api/shops/{id}/image
+ * @param {number|string} id
+ * @param {File} file
+ * @returns {Promise<Object>}
+ */
+export const uploadShopImage = async (id, file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return axiosClient.post(ENDPOINTS.SHOPS.IMAGE(id), formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
+
+/**
+ * Standalone shop image upload to Cloudinary.
+ * POST /api/shops/upload-image
+ * @param {File} file
+ * @returns {Promise<{ secure_url: string, url: string, imageUrl: string, public_id: string }>}
+ */
+export const uploadImage = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return axiosClient.post(ENDPOINTS.SHOPS.UPLOAD_IMAGE, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
+
 export default {
   getShops,
   getShopById,
@@ -81,4 +110,6 @@ export default {
   getMyShop,
   updateMyShop,
   createShop,
+  uploadShopImage,
+  uploadImage,
 };

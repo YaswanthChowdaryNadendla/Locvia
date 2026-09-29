@@ -36,6 +36,8 @@ export const ENDPOINTS = {
     UPDATE: (id) => `/shops/${id}`,
     MY_SHOP: '/shops/my',
     UPDATE_MY_SHOP: (id) => `/shops/${id}`,
+    IMAGE: (id) => `/shops/${id}/image`,
+    UPLOAD_IMAGE: '/shops/upload-image',
   },
 
   // Product Categories (CategoryController.java)

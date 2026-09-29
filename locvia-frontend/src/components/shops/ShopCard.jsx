@@ -16,6 +16,7 @@ const ShopCard = ({ shop }) => {
     name,
     description,
     image,
+    imageUrl,
     category,
     distance,
     rating,
@@ -33,7 +34,7 @@ const ShopCard = ({ shop }) => {
       {/* Shop Image Banner */}
       <div className="lv-shop-card-media">
         <img
-          src={normalizeImageUrl(image, 'shop')}
+          src={normalizeImageUrl(imageUrl || image || shop.imageUrl || shop.image, 'shop')}
           alt={name}
           onError={(e) => handleImageError(e, 'shop')}
           className="lv-shop-card-img"

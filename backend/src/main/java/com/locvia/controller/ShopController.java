@@ -9,9 +9,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.security.Principal;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Controller exposing public discovery and shop-owner management REST API endpoints.
@@ -118,5 +120,46 @@ public class ShopController {
             Principal principal) {
         ShopResponse response = shopService.updateOwnerShop(id, request, principal.getName());
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Uploads a shop image to Cloudinary and updates the shop's image URL.
+     * POST /api/shops/{id}/image
+     *
+     * @param id        target shop ID
+     * @param file      multipart image file
+     * @param principal authenticated user principal
+     * @return updated ShopResponse
+     */
+    @PostMapping("/{id}/image")
+    @PreAuthorize("hasAnyRole('SHOP_OWNER', 'ADMIN')")
+    public ResponseEntity<ShopResponse> uploadShopImage(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file,
+            Principal principal) {
+        ShopResponse response = shopService.uploadShopImage(id, file, principal.getName());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Standalone shop image upload to Cloudinary.
+     * POST /api/shops/upload-image
+     *
+     * @param file      multipart image file
+     * @param principal authenticated user principal
+     * @return map with secure_url, url, imageUrl, and public_id
+     */
+    @PostMapping("/upload-image")
+    @PreAuthorize("hasAnyRole('SHOP_OWNER', 'ADMIN')")
+    public ResponseEntity<Map<String, String>> uploadImage(
+            @RequestParam("file") MultipartFile file,
+            Principal principal) {
+        var result = shopService.uploadImage(file);
+        return ResponseEntity.ok(Map.of(
+                "secure_url", result.secureUrl(),
+                "url", result.secureUrl(),
+                "imageUrl", result.secureUrl(),
+                "public_id", result.publicId()
+        ));
     }
 }
