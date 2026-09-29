@@ -65,6 +65,12 @@ public class User {
     @Column(name = "google_subject", unique = true, length = 100)
     private String googleSubject;
 
+    /**
+     * Delivery partner online/offline availability status. Defaults to true.
+     */
+    @Column(name = "is_online", nullable = false, columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private Boolean isOnline = true;
+
     public User() {
     }
 
@@ -189,5 +195,17 @@ public class User {
 
     public void setGoogleSubject(String googleSubject) {
         this.googleSubject = googleSubject;
+    }
+
+    public Boolean getIsOnline() {
+        return isOnline;
+    }
+
+    public boolean isOnline() {
+        return isOnline != null && isOnline;
+    }
+
+    public void setIsOnline(Boolean isOnline) {
+        this.isOnline = isOnline != null ? isOnline : true;
     }
 }

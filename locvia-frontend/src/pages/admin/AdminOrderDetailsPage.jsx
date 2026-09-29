@@ -17,7 +17,8 @@ import {
   IndianRupee,
 } from 'lucide-react';
 import {
-  getOrderDetails,
+  fetchOrderDetails,
+  updateOrderStatusApi,
   formatINR,
   formatOrderDate,
 } from '../../services/adminOrderService';
@@ -27,6 +28,7 @@ import { SkeletonLoader } from '../../components/common/loaders';
 
 const ORDER_STATUS_STYLES = {
   PLACED: { background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' },
+  PENDING: { background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' },
   CONFIRMED: { background: '#E0F2FE', color: '#0369A1', border: '1px solid #BAE6FD' },
   PREPARING: { background: '#FEF3C7', color: '#B45309', border: '1px solid #FDE68A' },
   READY_FOR_PICKUP: { background: '#FEF08A', color: '#854D0E', border: '1px solid #FDE047' },
@@ -53,14 +55,47 @@ const AdminOrderDetailsPage = () => {
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
 
   useEffect(() => {
+    let isMounted = true;
     if (orderId) {
-      const details = getOrderDetails(orderId);
-      setOrder(details);
+      setLoading(true);
+      fetchOrderDetails(orderId)
+        .then((details) => {
+          if (isMounted) {
+            setOrder(details);
+            setLoading(false);
+          }
+        })
+        .catch(() => {
+          if (isMounted) setLoading(false);
+        });
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
+    return () => {
+      isMounted = false;
+    };
   }, [orderId]);
+
+  const handleConfirmCancel = async () => {
+    if (!order) return;
+    setCancelling(true);
+    try {
+      await updateOrderStatusApi(order.id, 'CANCELLED');
+      setOrder((prev) => ({ ...prev, orderStatus: 'CANCELLED' }));
+      setToastMessage(`Order #${order.id} was successfully cancelled.`);
+      setTimeout(() => setToastMessage(null), 3500);
+    } catch (err) {
+      alert(err.message || 'Failed to cancel order.');
+    } finally {
+      setCancelling(false);
+      setConfirmCancelOpen(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -121,7 +156,7 @@ const AdminOrderDetailsPage = () => {
   }
 
   const statusStyle = ORDER_STATUS_STYLES[order.orderStatus] || { background: '#F1F5F9', color: '#475569' };
-  const currentStageIndex = LIFECYCLE_STAGES.indexOf(order.orderStatus);
+  const currentStageIndex = order.orderStatus === 'PENDING' ? 0 : LIFECYCLE_STAGES.indexOf(order.orderStatus);
 
   return (
     <div className="admin-order-details-page" style={{ width: '100%', minWidth: 0 }}>
@@ -183,13 +218,37 @@ const AdminOrderDetailsPage = () => {
           </p>
         </div>
 
-        <div style={{ textAlign: 'right' }}>
-          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block' }}>
-            Final Payable Amount
-          </span>
-          <span style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-primary, #16A34A)' }}>
-            {formatINR(order.finalTotal)}
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {order.orderStatus !== 'CANCELLED' && order.orderStatus !== 'DELIVERED' && (
+            <button
+              onClick={() => setConfirmCancelOpen(true)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                background: '#FEE2E2',
+                border: '1px solid #FCA5A5',
+                color: '#B91C1C',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <XCircle size={16} />
+              Cancel Order
+            </button>
+          )}
+
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block' }}>
+              Final Payable Amount
+            </span>
+            <span style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-primary, #16A34A)' }}>
+              {formatINR(order.finalTotal)}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -720,6 +779,117 @@ const AdminOrderDetailsPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Confirmation Modal for Admin Order Cancellation */}
+      {confirmCancelOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '12px',
+              maxWidth: '440px',
+              width: '100%',
+              padding: '24px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  background: '#FEE2E2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#B91C1C',
+                }}
+              >
+                <XCircle size={22} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--color-text)' }}>
+                  Cancel Order #{order.id}?
+                </h3>
+                <p style={{ margin: 0, fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                  This will cancel the order, release any assigned delivery partner, and restock product inventory.
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+              <button
+                onClick={() => setConfirmCancelOpen(false)}
+                disabled={cancelling}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  background: '#F1F5F9',
+                  border: '1px solid #E2E8F0',
+                  color: '#475569',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Go Back
+              </button>
+              <button
+                onClick={handleConfirmCancel}
+                disabled={cancelling}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  background: '#DC2626',
+                  border: 'none',
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  opacity: cancelling ? 0.7 : 1,
+                }}
+              >
+                {cancelling ? 'Cancelling...' : 'Yes, Cancel Order'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Toast Notification */}
+      {toastMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            background: '#1E293B',
+            color: '#FFFFFF',
+            padding: '12px 20px',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: 500,
+            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.2)',
+            zIndex: 9999,
+          }}
+        >
+          {toastMessage}
+        </div>
+      )}
     </div>
   );
 };

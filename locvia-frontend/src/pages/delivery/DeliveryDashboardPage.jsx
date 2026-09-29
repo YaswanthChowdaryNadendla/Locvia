@@ -7,9 +7,13 @@ import { useAuth } from '../../context/AuthContext';
 import {
   getDeliveryAvailability,
   setDeliveryAvailability,
+  fetchDeliveryAvailability,
   getAvailableDeliveryRequests,
+  fetchAvailableDeliveryRequests,
   getActiveDelivery,
+  fetchActiveDeliveries,
   getCompletedDeliveries,
+  fetchCompletedDeliveries,
   getDeliverySummary,
 } from '../../services/deliveryService';
 import {
@@ -35,10 +39,47 @@ export default function DeliveryDashboardPage() {
   // State
   const [isOnline, setIsOnline] = useState(() => getDeliveryAvailability(partnerId));
   const [notification, setNotification] = useState(null);
+  const [activeDelivery, setActiveDelivery] = useState(() => getActiveDelivery(partnerId));
+  const [availableRequests, setAvailableRequests] = useState(() => getAvailableDeliveryRequests(partnerId));
+  const [completedDeliveries, setCompletedDeliveries] = useState(() => getCompletedDeliveries(partnerId));
 
-  // Synchronize Availability state
+  // Synchronize Availability and live deliveries
   useEffect(() => {
-    setIsOnline(getDeliveryAvailability(partnerId));
+    let isMounted = true;
+    const loadDashboardData = async () => {
+      try {
+        const avail = await fetchDeliveryAvailability(partnerId);
+        if (isMounted) setIsOnline(avail);
+
+        const [actives, reqs, comps] = await Promise.all([
+          fetchActiveDeliveries(partnerId),
+          fetchAvailableDeliveryRequests(partnerId),
+          fetchCompletedDeliveries(partnerId),
+        ]);
+
+        if (isMounted) {
+          if (actives && actives.length > 0) {
+            setActiveDelivery(actives[0]);
+          } else {
+            setActiveDelivery(null);
+          }
+          if (Array.isArray(reqs)) {
+            setAvailableRequests(reqs);
+          }
+          if (Array.isArray(comps)) {
+            setCompletedDeliveries(comps);
+          }
+        }
+      } catch (err) {
+        console.warn('Dashboard live load error:', err);
+      }
+    };
+
+    loadDashboardData();
+
+    return () => {
+      isMounted = false;
+    };
   }, [partnerId]);
 
   const showToast = (message, type = 'success') => {
@@ -78,10 +119,15 @@ export default function DeliveryDashboardPage() {
   }, [user?.name]);
 
   // Dynamic Data & Summary Metrics
-  const summary = getDeliverySummary(partnerId);
-  const activeDelivery = getActiveDelivery(partnerId);
-  const availableRequests = getAvailableDeliveryRequests();
-  const completedDeliveries = getCompletedDeliveries(partnerId);
+  const summary = useMemo(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    return {
+      todayCount: completedDeliveries.filter((d) => (d.deliveredAt || d.createdAt || '').slice(0, 10) === todayStr).length,
+      activeCount: activeDelivery ? 1 : 0,
+      completedCount: completedDeliveries.length,
+      availableCount: availableRequests.length,
+    };
+  }, [activeDelivery, completedDeliveries, availableRequests]);
 
   // Formatted Current Date
   const dateFormatted = new Date().toLocaleDateString('en-IN', {

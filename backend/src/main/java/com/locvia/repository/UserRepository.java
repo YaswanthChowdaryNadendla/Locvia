@@ -60,4 +60,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * Retrieves all users ordered newest first.
      */
     java.util.List<User> findAllByOrderByCreatedAtDesc();
+
+    /**
+     * Finds active approved users with a specific role.
+     */
+    java.util.List<User> findByRoleAndActiveTrueAndAccountStatus(com.locvia.entity.UserRole role, com.locvia.entity.AccountStatus accountStatus);
 }

@@ -323,6 +323,26 @@ public class DeliveryService {
     }
 
     /**
+     * Retrieves the online availability status of the authenticated delivery partner.
+     */
+    @Transactional(readOnly = true)
+    public boolean getPartnerAvailability(String partnerEmail) {
+        User partner = getUserByEmail(partnerEmail);
+        return partner.isOnline();
+    }
+
+    /**
+     * Updates the online availability status of the authenticated delivery partner.
+     */
+    @Transactional
+    public boolean setPartnerAvailability(String partnerEmail, boolean isOnline) {
+        User partner = getUserByEmail(partnerEmail);
+        partner.setIsOnline(isOnline);
+        userRepository.save(partner);
+        return isOnline;
+    }
+
+    /**
      * Throws AccessDeniedException if the delivery partner account has not been approved by Admin.
      * This prevents PENDING or REJECTED accounts from accessing operational delivery APIs.
      *

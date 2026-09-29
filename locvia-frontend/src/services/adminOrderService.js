@@ -99,11 +99,69 @@ export const getOrderDetails = (orderId) => {
 };
 
 /**
+ * Normalizes an order from API or storage into a consistent admin view model
+ */
+export const normalizeAdminOrder = (o) => {
+  if (!o) return null;
+  const customerName = o.customer?.name || o.address?.recipientName || o.address?.fullName || 'Customer';
+  const customerEmail = o.customer?.email || 'N/A';
+  const customerPhone = o.customer?.phone || o.address?.phoneNumber || o.address?.phone || 'N/A';
+
+  const items = (o.items || []).map((item) => ({
+    id: item.id || item.productId || Math.random(),
+    productId: item.productId || item.id,
+    name: item.productName || item.name || 'Product Item',
+    price: typeof item.productPrice === 'number' ? item.productPrice : (typeof item.price === 'number' ? item.price : 0),
+    quantity: typeof item.quantity === 'number' ? item.quantity : 1,
+    image: item.imageUrl || item.image || null,
+    shopId: item.shopId || null,
+    shopName: item.shopName || null,
+  }));
+
+  const totalItemCount = items.reduce((sum, i) => sum + (i.quantity || 1), 0);
+  const shopNames = [...new Set(items.map((i) => i.shopName).filter(Boolean))].join(', ') || 'Local Shop';
+
+  const finalTotal =
+    typeof o.totalAmount === 'number'
+      ? o.totalAmount
+      : (typeof o.finalTotal === 'number'
+      ? o.finalTotal
+      : items.reduce((sum, i) => sum + i.price * i.quantity, 0));
+
+  const orderStatus = (o.orderStatus || o.status || 'PENDING').toUpperCase();
+  const paymentStatus = (o.paymentStatus || 'PENDING').toUpperCase();
+
+  return {
+    ...o,
+    id: String(o.id || o.orderId || ''),
+    customerName,
+    customerEmail,
+    customerPhone,
+    items,
+    totalItemCount,
+    shopNames,
+    finalTotal,
+    pricing: {
+      subtotal: typeof o.subtotal === 'number' ? o.subtotal : finalTotal,
+      finalTotal,
+      deliveryFee: 0,
+      totalSavings: 0,
+      productDiscount: 0,
+      couponDiscount: 0,
+      mrpTotal: finalTotal,
+    },
+    orderStatus,
+    paymentStatus,
+    createdAt: o.createdAt || new Date().toISOString(),
+  };
+};
+
+/**
  * Calculates admin overview metrics for orders
  */
 export const calculateOrderStats = (orders = []) => {
   const total = orders.length;
-  const placed = orders.filter((o) => (o.orderStatus || '').toUpperCase() === 'PLACED').length;
+  const placed = orders.filter((o) => ['PLACED', 'PENDING', 'CONFIRMED'].includes((o.orderStatus || '').toUpperCase())).length;
   const preparing = orders.filter((o) => (o.orderStatus || '').toUpperCase() === 'PREPARING').length;
   const delivered = orders.filter((o) => (o.orderStatus || '').toUpperCase() === 'DELIVERED').length;
   const cancelled = orders.filter((o) => (o.orderStatus || '').toUpperCase() === 'CANCELLED').length;
@@ -129,11 +187,30 @@ export const calculateOrderStats = (orders = []) => {
 export const fetchAllOrders = async (params = {}) => {
   try {
     const orders = await adminApi.getOrders(params);
-    return Array.isArray(orders) ? orders : [];
+    if (Array.isArray(orders)) {
+      return orders.map(normalizeAdminOrder);
+    }
+    return getAllOrders();
   } catch (err) {
     console.error('Error fetching admin orders from API:', err);
     return getAllOrders();
   }
+};
+
+/**
+ * Fetches single order details from Spring Boot admin endpoint with local fallback.
+ * GET /api/admin/orders/{id}
+ */
+export const fetchOrderDetails = async (orderId) => {
+  try {
+    const raw = await adminApi.getOrderById(orderId);
+    if (raw) {
+      return normalizeAdminOrder(raw);
+    }
+  } catch (err) {
+    console.warn('Error fetching order from admin API, checking local:', err.message);
+  }
+  return getOrderDetails(orderId);
 };
 
 /**

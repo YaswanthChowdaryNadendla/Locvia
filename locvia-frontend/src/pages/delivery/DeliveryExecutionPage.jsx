@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   getActiveDelivery,
+  fetchActiveDeliveries,
   updateDeliveryExecutionStatus,
 } from '../../services/deliveryService';
 import { normalizeImageUrl, handleImageError } from '../../utils/imageUtils';
@@ -45,12 +46,19 @@ export default function DeliveryExecutionPage() {
   };
 
   // Load current active delivery
-  const loadActiveDelivery = () => {
+  const loadActiveDelivery = async () => {
     try {
-      const order = getActiveDelivery(partnerId);
-      setActiveOrder(order);
+      const activeList = await fetchActiveDeliveries(partnerId);
+      if (activeList && activeList.length > 0) {
+        setActiveOrder(activeList[0]);
+      } else {
+        const order = getActiveDelivery(partnerId);
+        setActiveOrder(order);
+      }
     } catch (err) {
       console.error('Error loading active delivery:', err);
+      const order = getActiveDelivery(partnerId);
+      setActiveOrder(order);
     } finally {
       setIsLoading(false);
     }
@@ -87,7 +95,8 @@ export default function DeliveryExecutionPage() {
     if (isUpdating || !activeOrder) return;
     setIsUpdating(true);
     try {
-      const res = updateDeliveryExecutionStatus(activeOrder.id || activeOrder.orderId, partnerId, 'PICKED_UP');
+      const targetId = activeOrder.deliveryId || activeOrder.id || activeOrder.orderId;
+      const res = await updateDeliveryExecutionStatus(targetId, partnerId, 'PICKED_UP');
       if (res.success) {
         setActiveOrder(res.order);
         showToast('Order marked as picked up successfully!');
@@ -105,7 +114,8 @@ export default function DeliveryExecutionPage() {
     if (isUpdating || !activeOrder) return;
     setIsUpdating(true);
     try {
-      const res = updateDeliveryExecutionStatus(activeOrder.id || activeOrder.orderId, partnerId, 'OUT_FOR_DELIVERY');
+      const targetId = activeOrder.deliveryId || activeOrder.id || activeOrder.orderId;
+      const res = await updateDeliveryExecutionStatus(targetId, partnerId, 'OUT_FOR_DELIVERY');
       if (res.success) {
         setActiveOrder(res.order);
         showToast('Delivery started! Out for delivery to customer.');
@@ -124,7 +134,8 @@ export default function DeliveryExecutionPage() {
     setIsUpdating(true);
     setIsCompletionModalOpen(false);
     try {
-      const res = updateDeliveryExecutionStatus(activeOrder.id || activeOrder.orderId, partnerId, 'DELIVERED');
+      const targetId = activeOrder.deliveryId || activeOrder.id || activeOrder.orderId;
+      const res = await updateDeliveryExecutionStatus(targetId, partnerId, 'DELIVERED');
       if (res.success) {
         setActiveOrder(res.order);
         showToast('Delivery completed successfully!');

@@ -21,6 +21,8 @@ import {
 } from 'lucide-react';
 import {
   getAllOrders,
+  fetchAllOrders,
+  updateOrderStatusApi,
   calculateOrderStats,
   formatINR,
   formatOrderDate,
@@ -32,6 +34,7 @@ const PAGE_SIZE = 10;
 
 const ORDER_STATUS_STYLES = {
   PLACED: { background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' },
+  PENDING: { background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' },
   CONFIRMED: { background: '#E0F2FE', color: '#0369A1', border: '1px solid #BAE6FD' },
   PREPARING: { background: '#FEF3C7', color: '#B45309', border: '1px solid #FDE68A' },
   READY_FOR_PICKUP: { background: '#FEF08A', color: '#854D0E', border: '1px solid #FDE047' },
@@ -60,12 +63,48 @@ const AdminOrdersPage = () => {
   const [dateFilter, setDateFilter] = useState('ALL');
   const [sortOption, setSortOption] = useState('newest');
   const [currentPage, setCurrentPage] = useState(1);
+  const [cancellingOrder, setCancellingOrder] = useState(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
 
-  // Load orders on mount
+  // Load live orders on mount
+  const loadOrders = async () => {
+    setIsLoading(true);
+    try {
+      const orders = await fetchAllOrders();
+      setOrdersList(orders);
+    } catch {
+      setOrdersList(getAllOrders());
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    setOrdersList(getAllOrders());
-    setIsLoading(false);
+    loadOrders();
   }, []);
+
+  const handleConfirmCancel = async () => {
+    if (!cancellingOrder) return;
+    setIsCancelling(true);
+    try {
+      await updateOrderStatusApi(cancellingOrder.id, 'CANCELLED');
+      setOrdersList((prev) =>
+        prev.map((ord) =>
+          String(ord.id) === String(cancellingOrder.id)
+            ? { ...ord, orderStatus: 'CANCELLED' }
+            : ord
+        )
+      );
+      setToastMessage(`Order #${cancellingOrder.id} successfully cancelled.`);
+      setTimeout(() => setToastMessage(null), 3500);
+    } catch (err) {
+      alert(err.message || 'Failed to cancel order.');
+    } finally {
+      setIsCancelling(false);
+      setCancellingOrder(null);
+    }
+  };
 
   // Reset page on filter changes
   useEffect(() => {
@@ -738,25 +777,44 @@ const AdminOrdersPage = () => {
 
                       {/* Actions */}
                       <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-                        <button
-                          onClick={() => navigate(`/admin/orders/${o.id}`)}
-                          style={{
-                            padding: '6px 14px',
-                            borderRadius: '6px',
-                            border: '1px solid var(--color-border, #CBD5E1)',
-                            background: '#FFFFFF',
-                            color: '#334155',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                          }}
-                        >
-                          <Eye size={14} />
-                          View
-                        </button>
+                        <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', justifyContent: 'flex-end' }}>
+                          <button
+                            onClick={() => navigate(`/admin/orders/${o.id}`)}
+                            style={{
+                              padding: '6px 14px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--color-border, #CBD5E1)',
+                              background: '#FFFFFF',
+                              color: '#334155',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <Eye size={14} />
+                            View
+                          </button>
+                          {o.orderStatus !== 'CANCELLED' && o.orderStatus !== 'DELIVERED' && (
+                            <button
+                              onClick={() => setCancellingOrder(o)}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                border: '1px solid #FECACA',
+                                background: '#FEF2F2',
+                                color: '#DC2626',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -862,27 +920,46 @@ const AdminOrdersPage = () => {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => navigate(`/admin/orders/${o.id}`)}
-                    style={{
-                      width: '100%',
-                      padding: '9px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--color-border, #CBD5E1)',
-                      background: '#FFFFFF',
-                      color: '#334155',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                    }}
-                  >
-                    <Eye size={16} />
-                    View Order Details
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                    <button
+                      onClick={() => navigate(`/admin/orders/${o.id}`)}
+                      style={{
+                        flex: 1,
+                        padding: '9px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--color-border, #CBD5E1)',
+                        background: '#FFFFFF',
+                        color: '#334155',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <Eye size={16} />
+                      View Details
+                    </button>
+                    {o.orderStatus !== 'CANCELLED' && o.orderStatus !== 'DELIVERED' && (
+                      <button
+                        onClick={() => setCancellingOrder(o)}
+                        style={{
+                          padding: '9px 16px',
+                          borderRadius: '6px',
+                          border: '1px solid #FECACA',
+                          background: '#FEF2F2',
+                          color: '#DC2626',
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -965,6 +1042,100 @@ const AdminOrdersPage = () => {
             </div>
           )}
         </>
+      )}
+
+      {/* Cancel Order Confirmation Modal */}
+      {cancellingOrder && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+          }}
+        >
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '12px',
+              maxWidth: '460px',
+              width: '100%',
+              padding: '24px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
+            }}
+          >
+            <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: 700, color: '#111827' }}>
+              Cancel Order #{cancellingOrder.id}?
+            </h3>
+            <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: '#4B5563', lineHeight: 1.5 }}>
+              Are you sure you want to cancel this order for customer <strong>{cancellingOrder.customerName}</strong>?
+              This action will set the status to <strong>CANCELLED</strong>, restore item stock to shop inventory, and cancel any associated delivery partner assignment.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                disabled={isCancelling}
+                onClick={() => setCancellingOrder(null)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: '1px solid #D1D5DB',
+                  background: '#FFFFFF',
+                  color: '#374151',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                }}
+              >
+                Keep Order
+              </button>
+              <button
+                disabled={isCancelling}
+                onClick={handleConfirmCancel}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: '#DC2626',
+                  color: '#FFFFFF',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: isCancelling ? 'not-allowed' : 'pointer',
+                  opacity: isCancelling ? 0.7 : 1,
+                }}
+              >
+                {isCancelling ? 'Cancelling...' : 'Confirm Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            background: '#1F2937',
+            color: '#FFFFFF',
+            padding: '12px 20px',
+            borderRadius: '8px',
+            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.2)',
+            zIndex: 9999,
+            fontSize: '14px',
+            fontWeight: 600,
+          }}
+        >
+          {toastMessage}
+        </div>
       )}
     </div>
   );

@@ -61,6 +61,11 @@ public interface DeliveryRepository extends JpaRepository<Delivery, Long> {
     long countByStatusIn(Collection<DeliveryStatus> statuses);
 
     /**
+     * Counts active deliveries for a partner across multiple statuses.
+     */
+    long countByDeliveryPartnerIdAndStatusIn(Long deliveryPartnerId, Collection<DeliveryStatus> statuses);
+
+    /**
      * Finds deliveries matching optional administrative filters (status, deliveryPartnerId, orderId).
      */
     @org.springframework.data.jpa.repository.Query("SELECT d FROM Delivery d WHERE " +

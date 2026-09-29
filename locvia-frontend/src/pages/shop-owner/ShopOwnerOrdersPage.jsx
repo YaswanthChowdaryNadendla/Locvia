@@ -32,6 +32,7 @@ import {
 
 const STATUS_BADGES = {
   PLACED: { label: 'NEW (PLACED)', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+  PENDING: { label: 'NEW (PENDING)', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
   CONFIRMED: { label: 'CONFIRMED', color: '#D97706', bg: '#FEF3C7', border: '#FDE68A' },
   PREPARING: { label: 'PREPARING', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
   READY_FOR_PICKUP: { label: 'READY FOR PICKUP', color: '#059669', bg: '#D1FAE5', border: '#A7F3D0' },
@@ -134,19 +135,19 @@ export default function ShopOwnerOrdersPage() {
   // Metric Summary Counts
   const orderList = Array.isArray(orders) ? orders : [];
   const newOrdersCount = useMemo(
-    () => orderList.filter((o) => ['PLACED', 'CONFIRMED'].includes((o.orderStatus || 'PLACED').toUpperCase())).length,
+    () => orderList.filter((o) => ['PLACED', 'PENDING', 'CONFIRMED'].includes((o.orderStatus || o.status || 'PLACED').toUpperCase())).length,
     [orderList]
   );
   const preparingCount = useMemo(
-    () => orderList.filter((o) => (o.orderStatus || '').toUpperCase() === 'PREPARING').length,
+    () => orderList.filter((o) => (o.orderStatus || o.status || '').toUpperCase() === 'PREPARING').length,
     [orderList]
   );
   const readyCount = useMemo(
-    () => orderList.filter((o) => (o.orderStatus || '').toUpperCase() === 'READY_FOR_PICKUP').length,
+    () => orderList.filter((o) => (o.orderStatus || o.status || '').toUpperCase() === 'READY_FOR_PICKUP').length,
     [orderList]
   );
   const completedCount = useMemo(
-    () => orderList.filter((o) => (o.orderStatus || '').toUpperCase() === 'DELIVERED').length,
+    () => orderList.filter((o) => (o.orderStatus || o.status || '').toUpperCase() === 'DELIVERED').length,
     [orderList]
   );
 
@@ -158,10 +159,10 @@ export default function ShopOwnerOrdersPage() {
         String(order.orderId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (order.address?.fullName || order.address?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-      const currentStatus = (order.orderStatus || 'PLACED').toUpperCase();
+      const currentStatus = (order.orderStatus || order.status || 'PLACED').toUpperCase();
 
       let matchesStatus = true;
-      if (activeTab === 'NEW') matchesStatus = ['PLACED', 'CONFIRMED'].includes(currentStatus);
+      if (activeTab === 'NEW') matchesStatus = ['PLACED', 'PENDING', 'CONFIRMED'].includes(currentStatus);
       else if (activeTab === 'PREPARING') matchesStatus = currentStatus === 'PREPARING';
       else if (activeTab === 'READY') matchesStatus = currentStatus === 'READY_FOR_PICKUP';
       else if (activeTab === 'OUT_FOR_DELIVERY') matchesStatus = currentStatus === 'OUT_FOR_DELIVERY';
@@ -674,7 +675,7 @@ export default function ShopOwnerOrdersPage() {
 
                       {/* Status Transition Action Buttons */}
                       <div style={{ display: 'inline-flex', gap: '8px' }}>
-                        {currentStatus === 'PLACED' && (
+                        {(currentStatus === 'PLACED' || currentStatus === 'PENDING') && (
                           <>
                             <button
                               onClick={() =>

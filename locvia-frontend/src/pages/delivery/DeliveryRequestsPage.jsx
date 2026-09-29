@@ -7,10 +7,13 @@ import { useAuth } from '../../context/AuthContext';
 import {
   getDeliveryAvailability,
   setDeliveryAvailability,
+  fetchDeliveryAvailability,
   getAvailableDeliveryRequests,
+  fetchAvailableDeliveryRequests,
   acceptDeliveryRequest,
   dismissDeliveryRequest,
   getActiveDelivery,
+  fetchActiveDeliveries,
 } from '../../services/deliveryService';
 import {
   Compass,
@@ -64,17 +67,27 @@ export default function DeliveryRequestsPage() {
   }, [partnerId]);
 
   // Load Requests Data
-  const loadRequests = useCallback(() => {
+  const loadRequests = useCallback(async () => {
     try {
       setError(null);
-      const active = getActiveDelivery(partnerId);
-      setActiveDelivery(active);
-
-      const available = getAvailableDeliveryRequests(partnerId);
-      setRequests(available);
+      const [avail, activeList, available] = await Promise.all([
+        fetchDeliveryAvailability(partnerId),
+        fetchActiveDeliveries(partnerId),
+        fetchAvailableDeliveryRequests(partnerId),
+      ]);
+      setIsOnline(avail);
+      setActiveDelivery(activeList && activeList.length > 0 ? activeList[0] : null);
+      setRequests(Array.isArray(available) ? available : []);
     } catch (err) {
       console.error('Error loading delivery requests:', err);
-      setError('Failed to load delivery requests.');
+      try {
+        const active = getActiveDelivery(partnerId);
+        setActiveDelivery(active);
+        const available = getAvailableDeliveryRequests(partnerId);
+        setRequests(available);
+      } catch {
+        setError('Failed to load delivery requests.');
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);

@@ -52,11 +52,29 @@ export const updateDeliveryStatus = async (deliveryId, status) => {
   return axiosClient.patch(ENDPOINTS.DELIVERY.UPDATE_STATUS(deliveryId), { status });
 };
 
+/**
+ * Retrieves delivery partner online availability status.
+ * GET /api/delivery/availability
+ */
+export const getAvailability = async () => {
+  return axiosClient.get('/delivery/availability');
+};
+
+/**
+ * Updates delivery partner online availability status.
+ * PATCH /api/delivery/availability
+ */
+export const updateAvailability = async (isOnline) => {
+  return axiosClient.patch('/delivery/availability', { online: isOnline, isOnline });
+};
+
 export default {
   getDeliveryRequests,
   getActiveDelivery,
   getCompletedDeliveries,
   getDeliveryById,
   updateDeliveryStatus,
+  getAvailability,
+  updateAvailability,
 };
 

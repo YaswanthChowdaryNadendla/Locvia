@@ -33,12 +33,28 @@ export const getDeliveryAvailability = (partnerId = 'user-partner') => {
   return true; // Default to Available (Online)
 };
 
+export const fetchDeliveryAvailability = async (partnerId = 'user-partner') => {
+  try {
+    const res = await deliveryApi.getAvailability();
+    if (res && typeof res.online === 'boolean') {
+      localStorage.setItem(`${AVAILABILITY_PREFIX}${partnerId}`, JSON.stringify(res.online));
+      return res.online;
+    }
+  } catch (err) {
+    console.warn('Backend getAvailability error:', err.message);
+  }
+  return getDeliveryAvailability(partnerId);
+};
+
 export const setDeliveryAvailability = (partnerId = 'user-partner', isAvailable) => {
   try {
     localStorage.setItem(`${AVAILABILITY_PREFIX}${partnerId}`, JSON.stringify(isAvailable));
   } catch (err) {
     console.error('Error saving delivery availability:', err);
   }
+  deliveryApi.updateAvailability(isAvailable).catch((err) => {
+    console.warn('Backend updateAvailability failed:', err.message);
+  });
   return isAvailable;
 };
 
@@ -151,8 +167,51 @@ export const acceptDeliveryRequest = (orderId, partnerId = 'user-partner') => {
   }
 };
 
-// Update delivery execution status (ASSIGNED -> PICKED_UP -> OUT_FOR_DELIVERY -> DELIVERED)
-export const updateDeliveryExecutionStatus = (orderId, partnerId, newStatus) => {
+/**
+ * Normalizes backend or local delivery object into standard UI shape
+ */
+export const normalizeDelivery = (d) => {
+  if (!d) return null;
+  const deliveryId = d.id;
+  const orderId = d.orderId || d.id;
+  const addr = d.deliveryAddress || d.address || {};
+  const address = {
+    fullName: addr.fullName || addr.recipientName || 'Customer',
+    addressLine1: addr.addressLine1 || '',
+    addressLine2: addr.addressLine2 || '',
+    city: addr.city || '',
+    postalCode: addr.postalCode || '',
+    phoneNumber: addr.phoneNumber || addr.phone || '',
+    phone: addr.phoneNumber || addr.phone || '',
+  };
+
+  const status = (d.status || d.orderStatus || 'ASSIGNED').toUpperCase();
+
+  return {
+    ...d,
+    id: deliveryId,
+    deliveryId,
+    orderId,
+    orderStatus: status,
+    status,
+    pricing: {
+      finalTotal: typeof d.totalAmount === 'number' ? d.totalAmount : (d.pricing?.finalTotal || 0),
+      deliveryFee: 40,
+    },
+    partnerEarning: d.partnerEarning || 60,
+    items: d.items && d.items.length > 0 ? d.items : [{ id: 1, name: `Order #${orderId}`, quantity: 1, price: d.totalAmount || 0 }],
+    shops: d.shops && d.shops.length > 0 ? d.shops : [{ name: 'Assigned Shop' }],
+    address,
+    assignedAt: d.assignedAt,
+    pickedUpAt: d.pickedUpAt,
+    deliveredAt: d.deliveredAt,
+    createdAt: d.createdAt,
+    updatedAt: d.updatedAt,
+  };
+};
+
+// Update delivery execution status in local storage
+export const updateLocalDeliveryExecutionStatus = (orderId, partnerId, newStatus) => {
   try {
     const allOrders = getLocalOrders();
     const cleanId = String(orderId).trim().toLowerCase();
@@ -206,6 +265,20 @@ export const updateDeliveryExecutionStatus = (orderId, partnerId, newStatus) => 
     console.error('Error updating delivery status:', err);
     return { success: false, message: err.message || 'Failed to update delivery status.' };
   }
+};
+
+// Update delivery execution status (ASSIGNED -> PICKED_UP -> OUT_FOR_DELIVERY -> DELIVERED)
+export const updateDeliveryExecutionStatus = async (orderOrDeliveryId, partnerId, newStatus) => {
+  try {
+    const res = await deliveryApi.updateDeliveryStatus(orderOrDeliveryId, newStatus);
+    if (res) {
+      updateLocalDeliveryExecutionStatus(orderOrDeliveryId, partnerId, newStatus);
+      return { success: true, order: normalizeDelivery(res) };
+    }
+  } catch (err) {
+    console.warn('Backend delivery status update failed, attempting local:', err.message);
+  }
+  return updateLocalDeliveryExecutionStatus(orderOrDeliveryId, partnerId, newStatus);
 };
 
 // Get current active delivery for partner
@@ -334,42 +407,49 @@ export const getDeliverySummary = (partnerId = 'user-partner') => {
  * Fetches available delivery requests from Spring Boot backend.
  * GET /api/delivery/requests
  */
-export const fetchAvailableDeliveryRequests = async () => {
+export const fetchAvailableDeliveryRequests = async (partnerId = 'user-partner') => {
   try {
     const res = await deliveryApi.getDeliveryRequests();
-    return Array.isArray(res) ? res : [];
+    if (Array.isArray(res) && res.length > 0) {
+      return res.map(normalizeDelivery);
+    }
   } catch (err) {
-    console.error('Error fetching delivery requests from API:', err);
-    return [];
+    console.warn('Error fetching delivery requests from API:', err.message);
   }
+  return getAvailableDeliveryRequests(partnerId);
 };
 
 /**
  * Fetches active deliveries assigned to partner from Spring Boot backend.
  * GET /api/delivery/active
  */
-export const fetchActiveDeliveries = async () => {
+export const fetchActiveDeliveries = async (partnerId = 'user-partner') => {
   try {
     const res = await deliveryApi.getActiveDelivery();
-    return Array.isArray(res) ? res : [];
+    if (Array.isArray(res) && res.length > 0) {
+      return res.map(normalizeDelivery);
+    }
   } catch (err) {
-    console.error('Error fetching active deliveries from API:', err);
-    return [];
+    console.warn('Error fetching active deliveries from API:', err.message);
   }
+  const localActive = getActiveDelivery(partnerId);
+  return localActive ? [localActive] : [];
 };
 
 /**
  * Fetches completed deliveries for partner from Spring Boot backend.
  * GET /api/delivery/completed
  */
-export const fetchCompletedDeliveries = async () => {
+export const fetchCompletedDeliveries = async (partnerId = 'user-partner') => {
   try {
     const res = await deliveryApi.getCompletedDeliveries();
-    return Array.isArray(res) ? res : [];
+    if (Array.isArray(res) && res.length > 0) {
+      return res.map(normalizeDelivery);
+    }
   } catch (err) {
-    console.error('Error fetching completed deliveries from API:', err);
-    return [];
+    console.warn('Error fetching completed deliveries from API:', err.message);
   }
+  return getCompletedDeliveries(partnerId);
 };
 
 /**

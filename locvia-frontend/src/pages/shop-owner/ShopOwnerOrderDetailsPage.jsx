@@ -32,6 +32,7 @@ import {
 
 const STATUS_BADGES = {
   PLACED: { label: 'NEW (PLACED)', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+  PENDING: { label: 'NEW (PENDING)', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
   CONFIRMED: { label: 'CONFIRMED', color: '#D97706', bg: '#FEF3C7', border: '#FDE68A' },
   PREPARING: { label: 'PREPARING', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
   READY_FOR_PICKUP: { label: 'READY FOR PICKUP', color: '#059669', bg: '#D1FAE5', border: '#A7F3D0' },
@@ -440,7 +441,7 @@ export default function ShopOwnerOrderDetailsPage() {
               </div>
 
               {/* Status Action Buttons */}
-              {currentStatus === 'PLACED' && (
+              {(currentStatus === 'PLACED' || currentStatus === 'PENDING') && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <button
                     onClick={() =>

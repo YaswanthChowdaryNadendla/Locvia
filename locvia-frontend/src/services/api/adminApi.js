@@ -158,6 +158,16 @@ export const getOrders = async (params = {}) => {
 };
 
 /**
+ * Fetches single order details for administration.
+ * GET /api/admin/orders/{id}
+ * @param {string|number} orderId
+ * @returns {Promise<Object>}
+ */
+export const getOrderById = async (orderId) => {
+  return axiosClient.get(ENDPOINTS.ADMIN.ORDER_BY_ID(orderId));
+};
+
+/**
  * Updates an order status from admin console.
  * PATCH /api/admin/orders/{id}/status
  * @param {string|number} orderId
@@ -247,6 +257,7 @@ export default {
   getProducts,
   getInventory,
   getOrders,
+  getOrderById,
   updateOrderStatus,
   getDeliveries,
   getPayments,

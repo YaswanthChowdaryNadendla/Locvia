@@ -75,4 +75,32 @@ public class DeliveryController {
         DeliveryResponse response = deliveryService.updateDeliveryStatus(userDetails.getUsername(), id, request.getStatus(), isAdmin);
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Retrieves the delivery partner's current online availability.
+     */
+    @GetMapping("/availability")
+    public ResponseEntity<java.util.Map<String, Object>> getAvailability(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        boolean online = deliveryService.getPartnerAvailability(userDetails.getUsername());
+        return ResponseEntity.ok(java.util.Map.of("online", online, "isOnline", online));
+    }
+
+    /**
+     * Updates the delivery partner's online availability status.
+     */
+    @RequestMapping(value = "/availability", method = {RequestMethod.PATCH, RequestMethod.PUT, RequestMethod.POST})
+    public ResponseEntity<java.util.Map<String, Object>> updateAvailability(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody java.util.Map<String, Object> body) {
+        boolean online = true;
+        if (body != null) {
+            if (body.containsKey("online")) {
+                online = Boolean.TRUE.equals(body.get("online")) || "true".equalsIgnoreCase(String.valueOf(body.get("online")));
+            } else if (body.containsKey("isOnline")) {
+                online = Boolean.TRUE.equals(body.get("isOnline")) || "true".equalsIgnoreCase(String.valueOf(body.get("isOnline")));
+            }
+        }
+        boolean updated = deliveryService.setPartnerAvailability(userDetails.getUsername(), online);
+        return ResponseEntity.ok(java.util.Map.of("online", updated, "isOnline", updated));
+    }
 }

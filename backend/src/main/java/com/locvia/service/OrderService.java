@@ -9,7 +9,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -28,6 +30,7 @@ public class OrderService {
     private final UserRepository userRepository;
     private final ShopRepository shopRepository;
     private final ProductRepository productRepository;
+    private final DeliveryRepository deliveryRepository;
 
     public OrderService(OrderRepository orderRepository,
                         OrderItemRepository orderItemRepository,
@@ -37,7 +40,8 @@ public class OrderService {
                         InventoryRepository inventoryRepository,
                         UserRepository userRepository,
                         ShopRepository shopRepository,
-                        ProductRepository productRepository) {
+                        ProductRepository productRepository,
+                        DeliveryRepository deliveryRepository) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.cartRepository = cartRepository;
@@ -47,6 +51,7 @@ public class OrderService {
         this.userRepository = userRepository;
         this.shopRepository = shopRepository;
         this.productRepository = productRepository;
+        this.deliveryRepository = deliveryRepository;
     }
 
     /**
@@ -176,6 +181,9 @@ public class OrderService {
         // 6. Clear cart items (Cart entity remains for reuse)
         cartItemRepository.deleteByCartId(cart.getId());
 
+        // 7. Automatically assign to an ONLINE Delivery Partner
+        autoAssignOrderToOnlineDeliveryPartner(savedOrder);
+
         OrderAddressResponse addressResponse = mapToOrderAddressResponse(savedOrder);
         return new OrderResponse(
                 savedOrder.getId(),
@@ -271,6 +279,14 @@ public class OrderService {
 
         order.setStatus(OrderStatus.CANCELLED);
         Order savedOrder = orderRepository.save(order);
+
+        // Cancel associated non-delivered delivery assignment
+        deliveryRepository.findByOrderId(order.getId()).ifPresent(delivery -> {
+            if (delivery.getStatus() != DeliveryStatus.DELIVERED) {
+                delivery.setStatus(DeliveryStatus.CANCELLED);
+                deliveryRepository.save(delivery);
+            }
+        });
 
         return buildOrderResponse(savedOrder);
     }
@@ -416,6 +432,14 @@ public class OrderService {
                     });
                 }
             }
+
+            // Cancel any non-delivered delivery assignment
+            deliveryRepository.findByOrderId(order.getId()).ifPresent(delivery -> {
+                if (delivery.getStatus() != DeliveryStatus.DELIVERED) {
+                    delivery.setStatus(DeliveryStatus.CANCELLED);
+                    deliveryRepository.save(delivery);
+                }
+            });
         }
 
         order.setStatus(newStatus);
@@ -593,5 +617,58 @@ public class OrderService {
     private User getUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+    }
+
+    /**
+     * Automatically assigns a newly created order to an approved, online delivery partner.
+     * Selects the partner with the fewest active delivery assignments (load balancing).
+     */
+    private void autoAssignOrderToOnlineDeliveryPartner(Order order) {
+        if (order == null || order.getId() == null) {
+            return;
+        }
+
+        try {
+            // Find all active, approved delivery partners
+            List<User> approvedPartners = userRepository.findByRoleAndActiveTrueAndAccountStatus(
+                    UserRole.DELIVERY_PARTNER, AccountStatus.APPROVED);
+
+            if (approvedPartners == null || approvedPartners.isEmpty()) {
+                return;
+            }
+
+            // Filter for partners who are online
+            List<User> onlinePartners = approvedPartners.stream()
+                    .filter(User::isOnline)
+                    .toList();
+
+            if (onlinePartners.isEmpty()) {
+                return;
+            }
+
+            // Statuses considered active for delivery load
+            List<DeliveryStatus> activeStatuses = List.of(
+                    DeliveryStatus.ASSIGNED, DeliveryStatus.PICKED_UP, DeliveryStatus.OUT_FOR_DELIVERY);
+
+            // Select partner with minimum active deliveries
+            User chosenPartner = onlinePartners.stream()
+                    .min(Comparator.comparingLong(p ->
+                            deliveryRepository.countByDeliveryPartnerIdAndStatusIn(p.getId(), activeStatuses)))
+                    .orElse(onlinePartners.get(0));
+
+            // Verify no active delivery already exists for this order
+            if (!deliveryRepository.existsByOrderIdAndStatusNot(order.getId(), DeliveryStatus.CANCELLED)) {
+                Delivery delivery = new Delivery();
+                delivery.setOrder(order);
+                delivery.setDeliveryPartner(chosenPartner);
+                delivery.setStatus(DeliveryStatus.ASSIGNED);
+                delivery.setAssignedAt(LocalDateTime.now());
+                deliveryRepository.save(delivery);
+            }
+        } catch (Exception e) {
+            // Non-blocking fallback so order creation is never aborted
+            org.slf4j.LoggerFactory.getLogger(OrderService.class)
+                    .warn("Automatic delivery assignment skipped: {}", e.getMessage());
+        }
     }
 }

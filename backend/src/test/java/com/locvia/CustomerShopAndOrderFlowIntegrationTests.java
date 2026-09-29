@@ -355,16 +355,15 @@ public class CustomerShopAndOrderFlowIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PREPARING"));
 
-        // Step 10: Admin assigns Delivery Partner to the order
-        CreateDeliveryRequest deliveryReq = new CreateDeliveryRequest(orderId, deliveryPartner.getId());
-        mockMvc.perform(post("/api/admin/deliveries")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(deliveryReq)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.orderId").value(orderId))
-                .andExpect(jsonPath("$.deliveryPartnerId").value(deliveryPartner.getId()))
-                .andExpect(jsonPath("$.status").value("ASSIGNED"));
+        // Step 10: Order was automatically assigned to the online Delivery Partner upon creation
+        mockMvc.perform(get("/api/admin/deliveries")
+                        .param("orderId", String.valueOf(orderId))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].orderId").value(orderId))
+                .andExpect(jsonPath("$[0].deliveryPartnerId").value(deliveryPartner.getId()))
+                .andExpect(jsonPath("$[0].status").value("ASSIGNED"));
 
         // Step 11: Delivery Partner sees assigned request (GET /api/delivery/requests)
         mockMvc.perform(get("/api/delivery/requests")
@@ -450,5 +449,92 @@ public class CustomerShopAndOrderFlowIntegrationTests {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.status").value("PENDING"));
+    }
+
+    @Test
+    @DisplayName("6. Customer places order -> Auto-assigned to online Delivery Partner -> Shop Owner views & updates -> Rider sees request -> Admin views & CANCELS")
+    void testCustomerOrderAutoAssignAndAdminCancelLifecycleFlow() throws Exception {
+        // Step 1: Customer adds item to cart
+        CartItemRequest cartReq = new CartItemRequest(testRice.getId(), 2);
+        mockMvc.perform(post("/api/cart/items")
+                        .header("Authorization", "Bearer " + customerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(cartReq)))
+                .andExpect(status().isOk());
+
+        int initialStock = inventoryRepository.findByProductId(testRice.getId()).orElseThrow().getQuantity();
+
+        // Step 2: Customer places order -> Order created
+        CreateOrderRequest orderReq = new CreateOrderRequest(customerAddress.getId());
+        MvcResult orderRes = mockMvc.perform(post("/api/orders")
+                        .header("Authorization", "Bearer " + customerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(orderReq)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andReturn();
+
+        JsonNode orderJson = objectMapper.readTree(orderRes.getResponse().getContentAsString());
+        Long orderId = orderJson.get("id").asLong();
+
+        // Step 3: Verify AUTOMATICALLY ASSIGNED to ONLINE Delivery Partner
+        mockMvc.perform(get("/api/admin/deliveries")
+                        .param("orderId", String.valueOf(orderId))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].orderId").value(orderId))
+                .andExpect(jsonPath("$[0].deliveryPartnerId").value(deliveryPartner.getId()))
+                .andExpect(jsonPath("$[0].status").value("ASSIGNED"));
+
+        // Step 4: Shop Owner sees what was ordered, quantity, amount/earnings, and updates order status
+        mockMvc.perform(get("/api/shops/{shopId}/orders/{orderId}", approvedShop.getId(), orderId)
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(orderId))
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].productName").value("Test Rice"))
+                .andExpect(jsonPath("$.items[0].quantity").value(2))
+                .andExpect(jsonPath("$.subtotal").value(200.00));
+
+        UpdateOrderStatusRequest updateReq = new UpdateOrderStatusRequest(OrderStatus.CONFIRMED);
+        mockMvc.perform(patch("/api/shops/{shopId}/orders/{orderId}/status", approvedShop.getId(), orderId)
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+
+        // Step 5: Delivery Partner sees assigned order
+        mockMvc.perform(get("/api/delivery/requests")
+                        .header("Authorization", "Bearer " + deliveryToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].orderId").value(orderId))
+                .andExpect(jsonPath("$[0].status").value("ASSIGNED"));
+
+        // Step 6: Admin sees the order
+        mockMvc.perform(get("/api/admin/orders/{id}", orderId)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(orderId))
+                .andExpect(jsonPath("$.orderStatus").value("CONFIRMED"));
+
+        // Step 7: Admin CANCELS the order
+        UpdateOrderStatusRequest cancelReq = new UpdateOrderStatusRequest(OrderStatus.CANCELLED);
+        mockMvc.perform(patch("/api/admin/orders/{id}/status", orderId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(cancelReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderStatus").value("CANCELLED"));
+
+        // Verify inventory restored and delivery cancelled
+        int restoredStock = inventoryRepository.findByProductId(testRice.getId()).orElseThrow().getQuantity();
+        assertThat(restoredStock).isEqualTo(initialStock);
+
+        Delivery delivery = deliveryRepository.findByOrderId(orderId).orElseThrow();
+        assertThat(delivery.getStatus()).isEqualTo(DeliveryStatus.CANCELLED);
     }
 }
