@@ -8,7 +8,7 @@ import com.locvia.entity.User;
 import com.locvia.entity.UserRole;
 import com.locvia.repository.EmailVerificationOtpRepository;
 import com.locvia.repository.UserRepository;
-import com.locvia.service.ResendEmailService;
+import com.locvia.service.EmailService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -56,7 +56,7 @@ class EmailVerificationConfigTests {
     private PasswordEncoder passwordEncoder;
 
     @MockBean
-    private ResendEmailService resendEmailService;
+    private EmailService emailService;
 
     private static final List<String> TEST_EMAILS = List.of(
             "cfg.cust@example.com",
@@ -76,8 +76,8 @@ class EmailVerificationConfigTests {
     }
 
     @Test
-    @DisplayName("1. EMAIL_VERIFICATION_ENABLED=false + CUSTOMER registration succeeds without Resend")
-    void customerRegistration_WhenDisabled_SucceedsWithoutResend() throws Exception {
+    @DisplayName("1. EMAIL_VERIFICATION_ENABLED=false + CUSTOMER registration succeeds without email dispatch")
+    void customerRegistration_WhenDisabled_SucceedsWithoutEmailDispatch() throws Exception {
         RegisterRequest req = new RegisterRequest(
                 "Config Cust",
                 "cfg.cust@example.com",
@@ -96,8 +96,8 @@ class EmailVerificationConfigTests {
                 .andExpect(jsonPath("$.user.role").value("CUSTOMER"))
                 .andExpect(jsonPath("$.user.accountStatus").value("APPROVED"));
 
-        // Verify Resend was NEVER invoked
-        verify(resendEmailService, never()).sendEmailVerificationOtp(anyString(), anyString());
+        // Verify EmailService was NEVER invoked
+        verify(emailService, never()).sendEmailVerificationOtp(anyString(), anyString());
 
         // Verify no OTP was persisted in the database
         assertThat(otpRepository.findByEmail("cfg.cust@example.com")).isEmpty();
@@ -131,7 +131,7 @@ class EmailVerificationConfigTests {
                 .andExpect(jsonPath("$.user.role").value("SHOP_OWNER"))
                 .andExpect(jsonPath("$.user.accountStatus").value("PENDING"));
 
-        verify(resendEmailService, never()).sendEmailVerificationOtp(anyString(), anyString());
+        verify(emailService, never()).sendEmailVerificationOtp(anyString(), anyString());
         assertThat(otpRepository.findByEmail("cfg.shop@example.com")).isEmpty();
 
         Optional<User> userOpt = userRepository.findByEmail("cfg.shop@example.com");
@@ -162,7 +162,7 @@ class EmailVerificationConfigTests {
                 .andExpect(jsonPath("$.user.role").value("DELIVERY_PARTNER"))
                 .andExpect(jsonPath("$.user.accountStatus").value("PENDING"));
 
-        verify(resendEmailService, never()).sendEmailVerificationOtp(anyString(), anyString());
+        verify(emailService, never()).sendEmailVerificationOtp(anyString(), anyString());
         assertThat(otpRepository.findByEmail("cfg.deliv@example.com")).isEmpty();
 
         Optional<User> userOpt = userRepository.findByEmail("cfg.deliv@example.com");
@@ -190,7 +190,7 @@ class EmailVerificationConfigTests {
                 .andExpect(jsonPath("$.message").value("Administrator accounts cannot be created via public registration"));
 
         assertThat(userRepository.findByEmail("cfg.admin@example.com")).isEmpty();
-        verify(resendEmailService, never()).sendEmailVerificationOtp(anyString(), anyString());
+        verify(emailService, never()).sendEmailVerificationOtp(anyString(), anyString());
     }
 
     @Test

@@ -24,7 +24,7 @@ import java.util.UUID;
 
 /**
  * Core business logic for the Forgot Password flow:
- *  1. requestOtp   — generate + BCrypt-hash OTP, send via Resend
+ *  1. requestOtp   — generate + BCrypt-hash OTP, send via EmailService
  *  2. verifyOtp    — validate OTP, issue UUID reset token
  *  3. resetPassword — validate reset token, BCrypt-encode new password, update User
  *
@@ -53,18 +53,18 @@ public class PasswordResetService {
     private final UserRepository             userRepository;
     private final PasswordResetOtpRepository otpRepository;
     private final PasswordEncoder            passwordEncoder;
-    private final ResendEmailService         resendEmailService;
+    private final EmailService               emailService;
     private final SecureRandom               secureRandom;
 
     public PasswordResetService(
             UserRepository userRepository,
             PasswordResetOtpRepository otpRepository,
             PasswordEncoder passwordEncoder,
-            ResendEmailService resendEmailService) {
+            EmailService emailService) {
         this.userRepository     = userRepository;
         this.otpRepository      = otpRepository;
         this.passwordEncoder    = passwordEncoder;
-        this.resendEmailService = resendEmailService;
+        this.emailService       = emailService;
         this.secureRandom       = new SecureRandom();
     }
 
@@ -72,7 +72,7 @@ public class PasswordResetService {
 
     /**
      * Initiates a password reset for the given email.
-     * Generates a 6-digit OTP and sends via Resend if the user exists.
+     * Generates a 6-digit OTP and sends via EmailService if the user exists.
      * Throws BusinessException (HTTP 404) if the email does not exist in the database.
      *
      * @param request contains the email address
@@ -117,8 +117,8 @@ public class PasswordResetService {
         record.setExpiresAt(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES));
         otpRepository.save(record);
 
-        // Send email via Resend — rawOtp passed here only, never logged
-        resendEmailService.sendPasswordResetOtp(email, rawOtp);
+        // Send email via Gmail SMTP — rawOtp passed here only, never logged
+        emailService.sendPasswordResetOtp(email, rawOtp);
 
         log.info("Password reset OTP issued for email: {}", email);
         return new MessageResponse(GENERIC_OTP_MESSAGE);

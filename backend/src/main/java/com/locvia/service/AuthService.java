@@ -68,7 +68,7 @@ public class AuthService {
      * Registers a new platform user with BCrypt password hashing and emailVerified = false.
      * Rejects attempts to publicly register with the ADMIN role.
      * SHOP_OWNER and DELIVERY_PARTNER accounts are created with PENDING status.
-     * Generates a 6-digit OTP and dispatches it via Resend for email verification.
+     * Generates a 6-digit OTP and dispatches it via email for verification.
      *
      * @param request registration payload
      * @return RegisterResponse indicating email verification is required
@@ -113,7 +113,7 @@ public class AuthService {
             user.setEmailVerified(false);
             User savedUser = userRepository.save(user);
 
-            // Generate and dispatch verification OTP via Resend
+            // Generate and dispatch verification OTP via email
             emailVerificationService.generateAndSendOtp(savedUser.getEmail());
 
             return new RegisterResponse(
@@ -124,7 +124,7 @@ public class AuthService {
             );
         } else {
             // When email verification is disabled:
-            // Do not call Resend, do not generate OTP.
+            // Do not send email, do not generate OTP.
             // Set emailVerified = true consistently so user can log in immediately.
             user.setEmailVerified(true);
             User savedUser = userRepository.save(user);

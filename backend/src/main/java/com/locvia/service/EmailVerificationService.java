@@ -42,24 +42,24 @@ public class EmailVerificationService {
     private final UserRepository                 userRepository;
     private final EmailVerificationOtpRepository otpRepository;
     private final PasswordEncoder                passwordEncoder;
-    private final ResendEmailService             resendEmailService;
+    private final EmailService                   emailService;
     private final SecureRandom                   secureRandom;
 
     public EmailVerificationService(
             UserRepository userRepository,
             EmailVerificationOtpRepository otpRepository,
             PasswordEncoder passwordEncoder,
-            ResendEmailService resendEmailService) {
+            EmailService emailService) {
         this.userRepository     = userRepository;
         this.otpRepository      = otpRepository;
         this.passwordEncoder    = passwordEncoder;
-        this.resendEmailService = resendEmailService;
+        this.emailService       = emailService;
         this.secureRandom       = new SecureRandom();
     }
 
     /**
      * Generates a 6-digit OTP, hashes it with BCrypt, saves/replaces in repository,
-     * and sends the raw OTP via Resend. The raw OTP is NEVER logged.
+     * and sends the raw OTP via email service. The raw OTP is NEVER logged.
      *
      * @param rawEmail recipient email address
      */
@@ -84,8 +84,8 @@ public class EmailVerificationService {
 
         otpRepository.save(record);
 
-        // Send email via Resend — rawOtp passed directly, never logged
-        resendEmailService.sendEmailVerificationOtp(email, rawOtp);
+        // Send email via Gmail SMTP — rawOtp passed directly, never logged
+        emailService.sendEmailVerificationOtp(email, rawOtp);
 
         log.info("Email verification OTP generated and dispatched for email: {}", email);
     }

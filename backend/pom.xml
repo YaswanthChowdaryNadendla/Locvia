@@ -122,11 +122,10 @@
             </exclusions>
         </dependency>
 
-        <!-- Resend Java SDK (Email OTP for Forgot Password) -->
+        <!-- Spring Boot Starter Mail (Gmail SMTP) -->
         <dependency>
-            <groupId>com.resend</groupId>
-            <artifactId>resend-java</artifactId>
-            <version>3.1.0</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
         <!-- Google API Client for Google ID Token verification -->

@@ -26,7 +26,7 @@ import java.security.Principal;
 /**
  * Controller providing REST API endpoints for user authentication:
  * public registration, public login, protected current-user profile check,
- * email OTP verification, and the three-step public password-reset flow (OTP via Resend email).
+ * email OTP verification, and the three-step public password-reset flow (OTP via email).
  */
 @RestController
 @RequestMapping("/api/auth")
