@@ -1,7 +1,8 @@
 // src/components/products/ProductCard.jsx
 // Reusable product card for grids and lists
 
-import { Star, Plus, Minus, Store } from 'lucide-react';
+import { useState } from 'react';
+import { Star, Plus, Minus, Store, Loader2 } from 'lucide-react';
 import { formatPrice, formatRating } from '../../utils/formatters';
 import { getShopByIdSync } from '../../services/shopService';
 import { useNavigate } from 'react-router-dom';
@@ -59,6 +60,8 @@ const ProductCard = ({
   const shop = getShopByIdSync(shopId);
   const shopName = shop ? shop.name : 'Local Store';
 
+  const [isAdding, setIsAdding] = useState(false);
+
   const handleCardClick = (e) => {
     // If user clicked inside shop link or button stepper, do not navigate to product
     if (e.target.closest('button') || e.target.closest('a')) {
@@ -67,13 +70,20 @@ const ProductCard = ({
     navigate(`/customer/product/${id}`);
   };
 
-  const handleAdd = (e) => {
+  const handleAdd = async (e) => {
     e.stopPropagation();
-    if (!isActuallyAvailable) return;
+    if (!isActuallyAvailable || isAdding) return;
     if (propOnAdd) {
       propOnAdd(product);
-    } else if (cart) {
-      cart.addItem(product, 1);
+      return;
+    }
+    if (cart) {
+      setIsAdding(true);
+      try {
+        await cart.addItem(product, 1);
+      } finally {
+        setIsAdding(false);
+      }
     }
   };
 
@@ -186,10 +196,19 @@ const ProductCard = ({
               {quantity === 0 ? (
                 <button
                   onClick={handleAdd}
-                  className="lv-product-add-btn"
+                  disabled={isAdding}
+                  className={`lv-product-add-btn ${isAdding ? 'opacity-75 cursor-wait' : ''}`}
                   aria-label={`Add ${name} to cart`}
                 >
-                  <Plus size={14} /> ADD
+                  {isAdding ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Loader2 size={13} className="animate-spin" /> ADD
+                    </span>
+                  ) : (
+                    <>
+                      <Plus size={14} /> ADD
+                    </>
+                  )}
                 </button>
               ) : (
                 <div className="lv-product-stepper">

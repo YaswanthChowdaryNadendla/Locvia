@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Star, Minus, Plus, ShoppingBag, Check, MapPin,
-  Clock, ShieldCheck, AlertCircle, MessageSquare, Pencil, LogIn,
+  Clock, ShieldCheck, AlertCircle, MessageSquare, Pencil, LogIn, Loader2,
 } from 'lucide-react';
 import ProductCard from '../../components/products/ProductCard';
 import { fetchProductById, fetchRelatedProducts } from '../../services/productService';
@@ -67,6 +67,7 @@ const ProductDetailsPage = () => {
   // Interaction states
   const [quantity, setQuantity] = useState(1);
   const [isAdded, setIsAdded] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   // Reviews state
@@ -196,15 +197,22 @@ const ProductDetailsPage = () => {
     }
   };
 
-  const handleAddToCart = () => {
-    if (!product || !product.isAvailable) return;
+  const handleAddToCart = async () => {
+    if (!product || !product.isAvailable || isAdding) return;
     if (cart) {
-      cart.addItem(product, quantity);
+      setIsAdding(true);
+      try {
+        const result = await cart.addItem(product, quantity);
+        if (result?.success) {
+          setIsAdded(true);
+          setTimeout(() => {
+            setIsAdded(false);
+          }, 800);
+        }
+      } finally {
+        setIsAdding(false);
+      }
     }
-    setIsAdded(true);
-    setTimeout(() => {
-      setIsAdded(false);
-    }, 2000);
   };
 
   // ── Review handlers ──────────────────────────────────────────
@@ -506,11 +514,13 @@ const ProductDetailsPage = () => {
                 </div>
 
                 <button
-                  className={`pdp-add-btn ${isAdded ? 'pdp-added-badge' : ''}`}
+                  className={`pdp-add-btn ${isAdded ? 'pdp-added-badge' : ''} ${isAdding ? 'opacity-80 cursor-wait' : ''}`}
                   onClick={handleAddToCart}
-                  disabled={!isAvailable}
+                  disabled={!isAvailable || isAdding}
                 >
-                  {isAdded ? (
+                  {isAdding ? (
+                    <><Loader2 size={20} className="animate-spin" /> Adding to Cart...</>
+                  ) : isAdded ? (
                     <><Check size={20} /> Added to Cart</>
                   ) : (
                     <><ShoppingBag size={20} /> Add to Cart</>

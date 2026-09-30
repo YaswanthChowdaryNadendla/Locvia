@@ -1,24 +1,50 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import * as cartApi from '../services/api/cartApi';
+import CartToast from '../components/cart/CartToast';
 
 // No hardcoded coupons — coupon validation comes from the backend API.
 const AVAILABLE_COUPONS = [];
 
 const CartContext = createContext(null);
 
-const mapCartResponseToItems = (cartData) => {
+const mapCartResponseToItems = (cartData, existingItems = [], currentProduct = null) => {
   if (!cartData || !Array.isArray(cartData.items)) return [];
-  return cartData.items.map((item) => ({
-    id: item.id, // Cart item ID in backend database
-    product: {
-      id: item.productId,
-      name: item.productName,
-      price: typeof item.productPrice === 'number' ? item.productPrice : parseFloat(item.productPrice) || 0,
-      image: item.imageUrl,
-      imageUrl: item.imageUrl,
-    },
-    quantity: item.quantity,
-  }));
+  const existingMap = new Map();
+  if (Array.isArray(existingItems)) {
+    existingItems.forEach((it) => {
+      if (it?.product?.id) {
+        existingMap.set(Number(it.product.id), it.product);
+      }
+    });
+  }
+  if (currentProduct?.id) {
+    const existing = existingMap.get(Number(currentProduct.id)) || {};
+    existingMap.set(Number(currentProduct.id), {
+      ...existing,
+      ...currentProduct,
+    });
+  }
+  return cartData.items.map((item) => {
+    const existingProd = existingMap.get(Number(item.productId));
+    return {
+      id: item.id, // Cart item ID in backend database
+      product: {
+        ...(existingProd || {}),
+        id: item.productId,
+        name: item.productName || existingProd?.name,
+        price: typeof item.productPrice === 'number' ? item.productPrice : parseFloat(item.productPrice) || 0,
+        image: item.imageUrl || existingProd?.image || existingProd?.imageUrl,
+        imageUrl: item.imageUrl || existingProd?.imageUrl || existingProd?.image,
+        shopId: existingProd?.shopId || item.shopId,
+        stock: existingProd?.stock,
+        stockQuantity: existingProd?.stockQuantity,
+        unit: existingProd?.unit,
+        discount: existingProd?.discount,
+        originalPrice: existingProd?.originalPrice,
+      },
+      quantity: item.quantity,
+    };
+  });
 };
 
 export const CartProvider = ({ children }) => {
@@ -41,6 +67,30 @@ export const CartProvider = ({ children }) => {
     }
   });
 
+  // Small non-blocking toast for instant feedback (duration ~800ms)
+  const [cartToast, setCartToast] = useState(null);
+  const toastTimeoutRef = useRef(null);
+  const addingProductIdsRef = useRef(new Set());
+
+  const showCartToast = useCallback((message, type = 'success', duration = 800) => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    setCartToast({ message, type });
+    toastTimeoutRef.current = setTimeout(() => {
+      setCartToast(null);
+      toastTimeoutRef.current = null;
+    }, duration);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // ── Sync with Backend API on Mount or Token Change ──────────────────────
   const refreshCartFromApi = useCallback(async () => {
     const token = localStorage.getItem('locvia_token');
@@ -52,9 +102,11 @@ export const CartProvider = ({ children }) => {
       try {
         const cartData = await cartApi.getCart();
         if (cartData && Array.isArray(cartData.items)) {
-          const loaded = mapCartResponseToItems(cartData);
-          setItems(loaded);
-          localStorage.setItem('locvia_cart_items', JSON.stringify(loaded));
+          setItems((prev) => {
+            const loaded = mapCartResponseToItems(cartData, prev);
+            localStorage.setItem('locvia_cart_items', JSON.stringify(loaded));
+            return loaded;
+          });
         }
       } catch (err) {
         console.warn('[CartContext] Could not fetch backend cart:', err.message);
@@ -154,38 +206,94 @@ export const CartProvider = ({ children }) => {
     setAppliedCoupon(null);
   }, []);
 
-  const addItem = useCallback(async (product, quantity = 1) => {
-    const token = localStorage.getItem('locvia_token');
-    const userRaw = localStorage.getItem('locvia_user');
-    const userRole = userRaw ? JSON.parse(userRaw)?.role : null;
+  const addItem = useCallback(
+    async (product, quantity = 1) => {
+      if (!product || !product.id) {
+        return { success: false, message: 'Invalid product' };
+      }
 
-    if (token && userRole === 'CUSTOMER') {
+      const effectiveStock =
+        product.stockQuantity !== undefined
+          ? product.stockQuantity
+          : product.stock !== undefined
+          ? product.stock
+          : null;
+
+      if (product.isAvailable === false || effectiveStock === 0) {
+        showCartToast('Out of stock', 'error', 1000);
+        return { success: false, message: 'Out of stock' };
+      }
+
+      // Check current quantity in cart against stock
+      const existingInCart = items.find((i) => i.product.id === product.id);
+      const currentQty = existingInCart ? existingInCart.quantity : 0;
+      if (effectiveStock !== null && currentQty + quantity > effectiveStock) {
+        const remaining = Math.max(0, effectiveStock - currentQty);
+        const msg = remaining === 0
+          ? 'Maximum stock reached in cart'
+          : `Only ${remaining} more item${remaining > 1 ? 's' : ''} available`;
+        showCartToast(msg, 'error', 1000);
+        return { success: false, message: msg };
+      }
+
+      // Prevent concurrent duplicate requests for the same product
+      if (addingProductIdsRef.current.has(product.id)) {
+        return { success: false, message: 'Operation in progress' };
+      }
+      addingProductIdsRef.current.add(product.id);
+
       try {
-        const response = await cartApi.addToCart({ productId: product.id, quantity });
-        if (response && Array.isArray(response.items)) {
-          setItems(mapCartResponseToItems(response));
-          return;
+        const token = localStorage.getItem('locvia_token');
+        const userRaw = localStorage.getItem('locvia_user');
+        const userRole = userRaw ? JSON.parse(userRaw)?.role : null;
+
+        if (token && userRole === 'CUSTOMER') {
+          const response = await cartApi.addToCart({ productId: product.id, quantity });
+          if (response && Array.isArray(response.items)) {
+            setItems((prev) => mapCartResponseToItems(response, prev, product));
+            showCartToast('Item added to cart', 'success', 800);
+            return { success: true };
+          } else {
+            throw new Error('Invalid cart response from server');
+          }
+        } else {
+          // Guest user (unauthenticated local state)
+          setItems((prev) => {
+            const existing = prev.find((i) => i.product.id === product.id);
+            const maxAllowed = effectiveStock !== null ? effectiveStock : 99;
+
+            if (existing) {
+              const newQty = Math.min(existing.quantity + quantity, maxAllowed > 0 ? maxAllowed : 99);
+              return prev.map((i) =>
+                i.product.id === product.id ? { ...i, quantity: newQty } : i
+              );
+            }
+            const initialQty = Math.min(quantity, maxAllowed > 0 ? maxAllowed : 99);
+            return [
+              ...prev,
+              {
+                id: `local_${Date.now()}_${product.id}`,
+                product,
+                quantity: initialQty,
+              },
+            ];
+          });
+          showCartToast('Item added to cart', 'success', 800);
+          return { success: true };
         }
       } catch (err) {
-        console.warn('[CartContext] Backend addToCart failed, updating locally:', err.message);
+        const errorMsg =
+          err?.response?.data?.message ||
+          err?.message ||
+          'Unable to add item to cart. Please try again.';
+        showCartToast(errorMsg, 'error', 1200);
+        return { success: false, message: errorMsg };
+      } finally {
+        addingProductIdsRef.current.delete(product.id);
       }
-    }
-
-    // Local state fallback for unauthenticated guests
-    setItems((prev) => {
-      const existing = prev.find((i) => i.product.id === product.id);
-      const stock = product.stock !== undefined ? product.stock : (product.isAvailable ? 50 : 0);
-
-      if (existing) {
-        const newQty = Math.min(existing.quantity + quantity, stock > 0 ? stock : 99);
-        return prev.map((i) =>
-          i.product.id === product.id ? { ...i, quantity: newQty } : i
-        );
-      }
-      const initialQty = Math.min(quantity, stock > 0 ? stock : 99);
-      return [...prev, { product, quantity: initialQty }];
-    });
-  }, []);
+    },
+    [items, showCartToast]
+  );
 
   const removeItem = useCallback(async (productId) => {
     const token = localStorage.getItem('locvia_token');
@@ -198,7 +306,7 @@ export const CartProvider = ({ children }) => {
       try {
         const response = await cartApi.removeFromCart(targetItem.id);
         if (response && Array.isArray(response.items)) {
-          setItems(mapCartResponseToItems(response));
+          setItems((prev) => mapCartResponseToItems(response, prev));
           return;
         }
       } catch (err) {
@@ -225,7 +333,7 @@ export const CartProvider = ({ children }) => {
       try {
         const response = await cartApi.updateCartItem(targetItem.id, quantity);
         if (response && Array.isArray(response.items)) {
-          setItems(mapCartResponseToItems(response));
+          setItems((prev) => mapCartResponseToItems(response, prev));
           return;
         }
       } catch (err) {
@@ -293,9 +401,12 @@ export const CartProvider = ({ children }) => {
         appliedCoupon,
         applyCouponCode,
         removeCoupon,
+        cartToast,
+        showCartToast,
       }}
     >
       {children}
+      <CartToast toast={cartToast} />
     </CartContext.Provider>
   );
 };
@@ -306,5 +417,3 @@ export const useCart = () => {
   if (!ctx) throw new Error('useCart must be used within CartProvider');
   return ctx;
 };
-
-

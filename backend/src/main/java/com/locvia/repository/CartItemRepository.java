@@ -2,6 +2,8 @@ package com.locvia.repository;
 
 import com.locvia.entity.CartItem;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -19,9 +21,10 @@ public interface CartItemRepository extends JpaRepository<CartItem, Long> {
     List<CartItem> findByCartId(Long cartId);
 
     /**
-     * Finds all items in a cart in chronological order of addition.
+     * Finds all items in a cart in chronological order of addition with product eagerly fetched.
      */
-    List<CartItem> findByCartIdOrderByCreatedAtAsc(Long cartId);
+    @Query("SELECT ci FROM CartItem ci JOIN FETCH ci.product WHERE ci.cart.id = :cartId ORDER BY ci.createdAt ASC")
+    List<CartItem> findByCartIdOrderByCreatedAtAsc(@Param("cartId") Long cartId);
 
     /**
      * Finds a specific product entry inside a given cart.

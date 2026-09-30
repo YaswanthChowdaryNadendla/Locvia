@@ -872,4 +872,47 @@ test('Integration Suite - Module 65', async (t) => {
     assert.ok(adminProductsSrc.includes('This action cannot be undone.'));
     assert.ok(adminProductsSrc.includes('handleConfirmDelete'));
   });
+
+  // ── Customer Add to Cart Instant Feedback & Toast Tests ──
+
+  await t.test('67. CartToast component exists, renders toast message, and uses non-blocking pointer-events', () => {
+    const toastSrc = fs.readFileSync(path.resolve(__dirname, '../components/cart/CartToast.jsx'), 'utf8');
+    assert.ok(toastSrc.includes('CartToast'));
+    assert.ok(toastSrc.includes('pointerEvents: \'none\''));
+    assert.ok(toastSrc.includes('#0c831f'));
+    assert.ok(toastSrc.includes('#dc2626'));
+    assert.ok(toastSrc.includes('cartToastSlideUp'));
+  });
+
+  await t.test('68. CartContext implements instant cart toast with ~800ms duration and in-flight guard', () => {
+    const cartContextSrc = fs.readFileSync(path.resolve(__dirname, '../context/CartContext.jsx'), 'utf8');
+    assert.ok(cartContextSrc.includes('CartToast'));
+    assert.ok(cartContextSrc.includes('cartToast'));
+    assert.ok(cartContextSrc.includes('Item added to cart'));
+    assert.ok(cartContextSrc.includes('800'));
+    assert.ok(cartContextSrc.includes('addingProductIdsRef'));
+  });
+
+  await t.test('69. CartContext addItem preserves product metadata and rejects out-of-stock products', () => {
+    const cartContextSrc = fs.readFileSync(path.resolve(__dirname, '../context/CartContext.jsx'), 'utf8');
+    assert.ok(cartContextSrc.includes('Out of stock'));
+    assert.ok(cartContextSrc.includes('mapCartResponseToItems'));
+    assert.ok(cartContextSrc.includes('existingProd'));
+  });
+
+  await t.test('70. ProductCard displays immediate loading state and guards against double clicks', () => {
+    const productCardSrc = fs.readFileSync(path.resolve(__dirname, '../components/products/ProductCard.jsx'), 'utf8');
+    assert.ok(productCardSrc.includes('isAdding'));
+    assert.ok(productCardSrc.includes('disabled={isAdding}'));
+    assert.ok(productCardSrc.includes('Loader2'));
+    assert.ok(productCardSrc.includes('await cart.addItem'));
+  });
+
+  await t.test('71. ProductDetailsPage implements isAdding state, loading spinner, and sets isAdded on success', () => {
+    const pdpSrc = fs.readFileSync(path.resolve(__dirname, '../pages/customer/ProductDetailsPage.jsx'), 'utf8');
+    assert.ok(pdpSrc.includes('isAdding'));
+    assert.ok(pdpSrc.includes('disabled={!isAvailable || isAdding}'));
+    assert.ok(pdpSrc.includes('Adding to Cart...'));
+    assert.ok(pdpSrc.includes('await cart.addItem'));
+  });
 });
