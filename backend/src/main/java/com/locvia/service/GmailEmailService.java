@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
+import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -102,11 +103,42 @@ public class GmailEmailService implements EmailService {
 
             mailSender.send(message);
             log.info("OTP email successfully dispatched to: {}", recipientEmail);
-        } catch (MailException | MessagingException e) {
-            log.error("Failed to send OTP email to {}: {}", recipientEmail, e.getClass().getSimpleName());
-            throw new ExternalServiceException("Failed to send OTP email. Please try again later.");
         } catch (Exception e) {
-            log.error("Failed to send OTP email to {}: {}", recipientEmail, e.getClass().getSimpleName());
+            Throwable rootCause = findRootCause(e);
+            String exceptionClass = e.getClass().getName();
+            String exceptionMsg = sanitize(e.getMessage(), otp);
+            String rootCauseClass = rootCause.getClass().getName();
+            String rootCauseMsg = sanitize(rootCause.getMessage(), otp);
+
+            log.error(
+                    "Failed to send OTP email to {}: Exception class=[{}], Exception message=[{}], Root cause class=[{}], Root cause message=[{}]",
+                    recipientEmail,
+                    exceptionClass,
+                    exceptionMsg,
+                    rootCauseClass,
+                    rootCauseMsg,
+                    e
+            );
+
+            if (e instanceof MailSendException mse) {
+                Exception[] messageExceptions = mse.getMessageExceptions();
+                if (messageExceptions != null && messageExceptions.length > 0) {
+                    for (int i = 0; i < messageExceptions.length; i++) {
+                        Exception sub = messageExceptions[i];
+                        log.error(
+                                "MailSendException nested exception #{}: [{}]: {}",
+                                i + 1,
+                                sub.getClass().getName(),
+                                sanitize(sub.getMessage(), otp)
+                        );
+                    }
+                }
+            }
+
+            if (rootCause != e && rootCause != e.getCause()) {
+                log.error("SMTP root cause exception for recipient {}:", recipientEmail, rootCause);
+            }
+
             throw new ExternalServiceException("Failed to send OTP email. Please try again later.");
         }
     }
@@ -207,5 +239,50 @@ public class GmailEmailService implements EmailService {
                 </body>
                 </html>
                 """.formatted(heading, intro, otp);
+    }
+
+    /**
+     * Traverses the exception tree, resolving Spring MailSendException sub-exceptions,
+     * Jakarta MessagingException next-exceptions, and standard cause chains to locate the root failure.
+     */
+    private Throwable findRootCause(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof MailSendException mse) {
+                Exception[] messageExceptions = mse.getMessageExceptions();
+                if (messageExceptions != null && messageExceptions.length > 0) {
+                    current = messageExceptions[0];
+                    continue;
+                }
+            }
+            if (current instanceof MessagingException me && me.getNextException() != null) {
+                current = me.getNextException();
+                continue;
+            }
+            if (current.getCause() != null && current.getCause() != current) {
+                current = current.getCause();
+                continue;
+            }
+            break;
+        }
+        return current != null ? current : throwable;
+    }
+
+    /**
+     * Sanitizes exception messages to guarantee sensitive information (OTP, username, credentials)
+     * is NEVER printed or exposed in logs.
+     */
+    private String sanitize(String message, String otp) {
+        if (message == null) {
+            return "No message";
+        }
+        String sanitized = message;
+        if (mailUsername != null && !mailUsername.isBlank()) {
+            sanitized = sanitized.replace(mailUsername, "[PROTECTED_MAIL_USERNAME]");
+        }
+        if (otp != null && !otp.isBlank()) {
+            sanitized = sanitized.replace(otp, "[PROTECTED_OTP]");
+        }
+        return sanitized;
     }
 }
