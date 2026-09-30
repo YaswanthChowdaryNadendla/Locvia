@@ -5,6 +5,7 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.mail.MailSendException;
@@ -31,14 +32,28 @@ public class GmailEmailService implements EmailService {
     private final JavaMailSender mailSender;
     private final String mailUsername;
     private final String fromName;
+    private final String mailHost;
+    private final int mailPort;
 
+    @Autowired
     public GmailEmailService(
             JavaMailSender mailSender,
             @Value("${spring.mail.username:}") String mailUsername,
-            @Value("${locvia.mail.from-name:Locvia}") String fromName) {
+            @Value("${locvia.mail.from-name:Locvia}") String fromName,
+            @Value("${spring.mail.host:smtp.gmail.com}") String mailHost,
+            @Value("${spring.mail.port:465}") int mailPort) {
         this.mailSender = mailSender;
         this.mailUsername = mailUsername;
         this.fromName = fromName;
+        this.mailHost = mailHost != null && !mailHost.isBlank() ? mailHost : "smtp.gmail.com";
+        this.mailPort = mailPort > 0 ? mailPort : 465;
+    }
+
+    public GmailEmailService(
+            JavaMailSender mailSender,
+            String mailUsername,
+            String fromName) {
+        this(mailSender, mailUsername, fromName, "smtp.gmail.com", 465);
     }
 
     /**
@@ -88,9 +103,13 @@ public class GmailEmailService implements EmailService {
                     StandardCharsets.UTF_8.name()
             );
 
-            try {
-                helper.setFrom(mailUsername, fromName);
-            } catch (UnsupportedEncodingException e) {
+            if (fromName != null && !fromName.isBlank()) {
+                try {
+                    helper.setFrom(mailUsername, fromName);
+                } catch (UnsupportedEncodingException e) {
+                    helper.setFrom(mailUsername);
+                }
+            } else {
                 helper.setFrom(mailUsername);
             }
 
@@ -111,8 +130,10 @@ public class GmailEmailService implements EmailService {
             String rootCauseMsg = sanitize(rootCause.getMessage(), otp);
 
             log.error(
-                    "Failed to send OTP email to {}: Exception class=[{}], Exception message=[{}], Root cause class=[{}], Root cause message=[{}]",
+                    "Failed to send OTP email to {}: SMTP Host=[{}], Port=[{}], Exception class=[{}], Exception message=[{}], Root cause class=[{}], Root cause message=[{}]",
                     recipientEmail,
+                    mailHost,
+                    mailPort,
                     exceptionClass,
                     exceptionMsg,
                     rootCauseClass,
