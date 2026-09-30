@@ -122,11 +122,6 @@
             </exclusions>
         </dependency>
 
-        <!-- Spring Boot Starter Mail (Gmail SMTP) -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-mail</artifactId>
-        </dependency>
 
         <!-- Google API Client for Google ID Token verification -->
         <dependency>

@@ -84,7 +84,7 @@ public class EmailVerificationService {
 
         otpRepository.save(record);
 
-        // Send email via Gmail SMTP — rawOtp passed directly, never logged
+        // Send email via EmailService — rawOtp passed directly, never logged
         emailService.sendEmailVerificationOtp(email, rawOtp);
 
         log.info("Email verification OTP generated and dispatched for email: {}", email);

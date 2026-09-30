@@ -117,7 +117,7 @@ public class PasswordResetService {
         record.setExpiresAt(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES));
         otpRepository.save(record);
 
-        // Send email via Gmail SMTP — rawOtp passed here only, never logged
+        // Send email via EmailService — rawOtp passed here only, never logged
         emailService.sendPasswordResetOtp(email, rawOtp);
 
         log.info("Password reset OTP issued for email: {}", email);
