@@ -14,6 +14,7 @@ export const ENDPOINTS = {
     RESEND_SIGNUP_OTP: '/auth/resend-signup-otp',
     // Password reset flow (3-step, public)
     FORGOT_PASSWORD: '/auth/forgot-password',
+    RESEND_RESET_OTP: '/auth/resend-reset-otp',
     VERIFY_RESET_OTP: '/auth/verify-reset-otp',
     RESET_PASSWORD: '/auth/reset-password',
   },

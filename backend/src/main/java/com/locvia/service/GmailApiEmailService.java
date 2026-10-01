@@ -151,11 +151,13 @@ public class GmailApiEmailService implements EmailService {
         String boundary = "=_locvia_" + UUID.randomUUID().toString().replace("-", "");
         String fromHeader = formatFromHeader(sender);
         String dateHeader = DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.now());
+        String messageId = "<" + UUID.randomUUID().toString() + "@locvia.com>";
 
         StringBuilder sb = new StringBuilder();
         sb.append("From: ").append(fromHeader).append("\r\n");
         sb.append("To: ").append(recipient).append("\r\n");
         sb.append("Date: ").append(dateHeader).append("\r\n");
+        sb.append("Message-ID: ").append(messageId).append("\r\n");
         sb.append("Subject: ").append(subject).append("\r\n");
         sb.append("MIME-Version: 1.0\r\n");
         sb.append("Content-Type: multipart/alternative; boundary=\"").append(boundary).append("\"\r\n\r\n");

@@ -151,6 +151,20 @@ public class AuthController {
     }
 
     /**
+     * Public endpoint to resend password reset OTP code.
+     * Enforces 60-second cooldown on the backend.
+     * POST /api/auth/resend-reset-otp
+     *
+     * @param request contains the email address
+     * @return generic success message
+     */
+    @PostMapping("/resend-reset-otp")
+    public ResponseEntity<MessageResponse> resendResetOtp(@Valid @RequestBody ForgotPasswordRequest request) {
+        MessageResponse response = passwordResetService.requestOtp(request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * Step 2 — Verify the 6-digit OTP submitted by the user.
      * POST /api/auth/verify-reset-otp
      *

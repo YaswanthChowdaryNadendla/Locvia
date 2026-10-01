@@ -94,10 +94,15 @@ public class PasswordResetService {
         // Enforce 60-second resend cooldown
         Optional<PasswordResetOtp> existing = otpRepository.findByEmail(email);
         if (existing.isPresent()) {
-            LocalDateTime cooldownEnd = existing.get().getCreatedAt().plusSeconds(RESEND_COOLDOWN_SECONDS);
-            if (LocalDateTime.now().isBefore(cooldownEnd)) {
-                throw new BusinessException(
-                        "Please wait before requesting another code.", HttpStatus.TOO_MANY_REQUESTS);
+            LocalDateTime createdAt = existing.get().getCreatedAt();
+            if (createdAt != null) {
+                LocalDateTime cooldownEnd = createdAt.plusSeconds(RESEND_COOLDOWN_SECONDS);
+                LocalDateTime now = LocalDateTime.now();
+                if (now.isBefore(cooldownEnd)) {
+                    long secondsRemaining = Math.max(1, java.time.Duration.between(now, cooldownEnd).getSeconds() + 1);
+                    throw new BusinessException(
+                            "Please wait " + secondsRemaining + " seconds before requesting another code.", HttpStatus.TOO_MANY_REQUESTS);
+                }
             }
         }
 
@@ -115,7 +120,7 @@ public class PasswordResetService {
         record.setEmail(email);
         record.setOtpHash(otpHash);
         record.setExpiresAt(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES));
-        otpRepository.save(record);
+        otpRepository.saveAndFlush(record);
 
         // Send email via EmailService — rawOtp passed here only, never logged
         emailService.sendPasswordResetOtp(email, rawOtp);
@@ -171,7 +176,7 @@ public class PasswordResetService {
         record.setVerifiedAt(LocalDateTime.now());
         record.setResetToken(UUID.randomUUID().toString());
         record.setResetTokenExpiresAt(LocalDateTime.now().plusMinutes(RESET_TOKEN_EXPIRY_MINS));
-        otpRepository.save(record);
+        otpRepository.saveAndFlush(record);
 
         log.info("OTP verified for email: {}", email);
         return new VerifyOtpResponse(record.getResetToken(), "OTP verified successfully.");
@@ -219,7 +224,7 @@ public class PasswordResetService {
 
         // Mark reset token as consumed
         record.setResetTokenUsed(true);
-        otpRepository.save(record);
+        otpRepository.saveAndFlush(record);
 
         log.info("Password reset completed for email: {}", email);
         return new MessageResponse("Password has been reset successfully. You can now log in.");

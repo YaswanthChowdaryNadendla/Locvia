@@ -12,12 +12,12 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 
+@Disabled("Live integration test sending real emails via Gmail API - enable explicitly when testing credentials")
 class RealGmailApiSendLiveTest {
 
     @Test
-    @Disabled("Manual live verification test only - do not send emails in automated builds")
-    @DisplayName("Live test: send real email through Gmail API using .env credentials")
-    void testRealEmailSend() {
+    @DisplayName("Live test: send two consecutive emails through Gmail API to test resend")
+    void testRealEmailSendTwoConsecutive() {
         Map<String, String> env = loadDotEnv();
         String clientId = env.get("GOOGLE_GMAIL_CLIENT_ID");
         String clientSecret = env.get("GOOGLE_GMAIL_CLIENT_SECRET");
@@ -36,10 +36,15 @@ class RealGmailApiSendLiveTest {
                 sender
         );
 
-        System.out.println("Initiating real Gmail API send to " + sender + "...");
-        assertThatCode(() -> emailService.sendPasswordResetOtp(sender, "654321"))
+        System.out.println("Initiating real Gmail API send #1 (Initial OTP)...");
+        assertThatCode(() -> emailService.sendPasswordResetOtp(sender, "111111"))
                 .doesNotThrowAnyException();
-        System.out.println("SUCCESS! Gmail API accepted the message.");
+        System.out.println("SUCCESS! Gmail API accepted email #1.");
+
+        System.out.println("Initiating real Gmail API send #2 (Resend OTP)...");
+        assertThatCode(() -> emailService.sendPasswordResetOtp(sender, "222222"))
+                .doesNotThrowAnyException();
+        System.out.println("SUCCESS! Gmail API accepted email #2.");
     }
 
     private Map<String, String> loadDotEnv() {

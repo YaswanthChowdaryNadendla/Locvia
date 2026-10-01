@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, AlertCircle, Eye, EyeOff, Mail, KeyRound } from 'lucide-react';
 import heroImage from '../../assets/hero1.png';
 import { isValidEmail } from '../../utils/validators';
-import { forgotPassword, verifyResetOtp, resetPassword } from '../../services/api/authApi';
+import { forgotPassword, resendResetOtp, verifyResetOtp, resetPassword } from '../../services/api/authApi';
 
 const RESEND_COOLDOWN = 60;
 
@@ -17,6 +17,7 @@ const ForgotPasswordFlow = () => {
   const [email, setEmail]                     = useState('');
   const [resetToken, setResetToken]           = useState('');
   const [error, setError]                     = useState('');
+  const [successMessage, setSuccessMessage]   = useState('');
   const [isEmailNotFound, setIsEmailNotFound] = useState(false);
   const [isLoading, setIsLoading]             = useState(false);
   const [otp, setOtp]                         = useState('');
@@ -43,6 +44,7 @@ const ForgotPasswordFlow = () => {
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
     setIsEmailNotFound(false);
     const trimmedEmail = email.trim();
     if (!trimmedEmail) { setError('Email is required.'); return; }
@@ -69,6 +71,7 @@ const ForgotPasswordFlow = () => {
   const handleOtpSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
     const trimmedOtp = otp.trim();
     if (!trimmedOtp) { setError('Please enter the verification code.'); return; }
     if (!/^\d{6}$/.test(trimmedOtp)) { setError('Code must be exactly 6 digits.'); return; }
@@ -78,7 +81,7 @@ const ForgotPasswordFlow = () => {
       setResetToken(data.resetToken);
       setStep('password');
     } catch (err) {
-      setError(err?.response?.data?.message || 'Invalid or expired code. Please try again.');
+      setError(err?.message || err?.response?.data?.message || 'Invalid or expired code. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -86,13 +89,16 @@ const ForgotPasswordFlow = () => {
 
   const handleResend = async () => {
     if (cooldown > 0 || isLoading) return;
-    setError(''); setOtp('');
+    setError('');
+    setSuccessMessage('');
+    setOtp('');
     setIsLoading(true);
     try {
-      await forgotPassword({ email: email.trim() });
+      await resendResetOtp({ email: email.trim() });
+      setSuccessMessage('A new verification code has been sent to your email.');
       startCooldown();
     } catch (err) {
-      setError(err?.response?.data?.message || 'Could not resend code. Please try again.');
+      setError(err?.message || err?.response?.data?.message || 'Could not resend code. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -109,7 +115,7 @@ const ForgotPasswordFlow = () => {
       await resetPassword({ email: email.trim(), resetToken, newPassword });
       setStep('success');
     } catch (err) {
-      setError(err?.response?.data?.message || 'Could not reset password. Please try again.');
+      setError(err?.message || err?.response?.data?.message || 'Could not reset password. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -121,8 +127,25 @@ const ForgotPasswordFlow = () => {
     </div>
   ) : null;
 
+  const SuccessBanner = ({ msg }) => msg ? (
+    <div className="auth-success-banner" role="status" style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      backgroundColor: '#f0fdf4',
+      border: '1px solid #bbf7d0',
+      color: '#166534',
+      padding: '0.75rem 1rem',
+      borderRadius: '0.5rem',
+      marginBottom: '1rem',
+      fontSize: '0.875rem'
+    }}>
+      <CheckCircle2 size={16} /><span>{msg}</span>
+    </div>
+  ) : null;
+
   const resetFlow = () => {
-    setStep('email'); setError(''); setOtp(''); setIsEmailNotFound(false);
+    setStep('email'); setError(''); setSuccessMessage(''); setOtp(''); setIsEmailNotFound(false);
     setNewPassword(''); setConfirmPassword('');
   };
 
@@ -203,6 +226,7 @@ const ForgotPasswordFlow = () => {
                 We sent a 6-digit code to <strong>{email}</strong>. Enter it below.
               </p>
               <ErrorBanner msg={error} />
+              <SuccessBanner msg={successMessage} />
               <form onSubmit={handleOtpSubmit} className="auth-form" noValidate>
                 <div className="auth-field">
                   <label htmlFor="otp" className="auth-label">Verification Code</label>
@@ -210,7 +234,7 @@ const ForgotPasswordFlow = () => {
                     <input id="otp" name="otp" type="text" inputMode="numeric" maxLength={6}
                       className={`auth-input ${error ? 'auth-input--error' : ''}`}
                       placeholder="000000" value={otp}
-                      onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '').slice(0, 6)); setError(''); }}
+                      onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '').slice(0, 6)); setError(''); setSuccessMessage(''); }}
                       autoFocus
                       style={{ letterSpacing: '6px', fontSize: '1.25rem', textAlign: 'center' }} />
                   </div>

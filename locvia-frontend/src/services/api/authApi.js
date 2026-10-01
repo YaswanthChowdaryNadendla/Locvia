@@ -80,6 +80,17 @@ export const forgotPassword = async ({ email }) => {
 };
 
 /**
+ * Resends a new 6-digit OTP to the given email for password recovery.
+ * Backend enforces 60-second cooldown and replaces any previous OTP.
+ * @param {Object} payload
+ * @param {string} payload.email
+ * @returns {Promise<{ message: string }>}
+ */
+export const resendResetOtp = async ({ email }) => {
+  return axiosClient.post(ENDPOINTS.AUTH.RESEND_RESET_OTP, { email }, { timeout: AUTH_REQUEST_TIMEOUT });
+};
+
+/**
  * Step 2: Verifies the 6-digit OTP entered by the user.
  * On success, returns a short-lived resetToken UUID for Step 3.
  * @param {Object} payload

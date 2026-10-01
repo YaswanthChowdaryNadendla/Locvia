@@ -81,7 +81,12 @@ public class SecurityConfig {
                                 "/api/auth/resend-signup-otp"
                         ).permitAll()
                         // Password-reset endpoints — public (unauthenticated users need these)
-                        .requestMatchers("/api/auth/forgot-password", "/api/auth/verify-reset-otp", "/api/auth/reset-password").permitAll()
+                        .requestMatchers(
+                                "/api/auth/forgot-password",
+                                "/api/auth/resend-reset-otp",
+                                "/api/auth/verify-reset-otp",
+                                "/api/auth/reset-password"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/payments/razorpay/webhook").permitAll()
                         .requestMatchers("/error").permitAll()
                         // Public shop discovery (list and numeric ID lookup)
