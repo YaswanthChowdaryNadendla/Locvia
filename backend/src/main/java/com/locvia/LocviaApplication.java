@@ -34,7 +34,7 @@ public class LocviaApplication {
                     int idx = line.indexOf('=');
                     String key = line.substring(0, idx).trim();
                     String val = line.substring(idx + 1).trim();
-                    if (System.getProperty(key) == null && System.getenv(key) == null) {
+                    if (System.getProperty(key) == null) {
                         System.setProperty(key, val);
                     }
                 }

@@ -15,3 +15,7 @@ locvia-frontend/*.log
 .env
 *.log
 .DS_Store
+*client_secret*.json
+.locvia-tokens/
+tokens/
+oauth-tokens/

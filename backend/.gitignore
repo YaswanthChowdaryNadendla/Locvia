@@ -29,6 +29,10 @@ mvnw.cmd
 .env.*.local
 application-local.properties
 application-*.local.properties
+*client_secret*.json
+.locvia-tokens/
+tokens/
+oauth-tokens/
 
 # IDE configuration files
 .idea/
