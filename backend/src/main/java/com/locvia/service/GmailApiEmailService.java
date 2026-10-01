@@ -85,6 +85,46 @@ public class GmailApiEmailService implements EmailService {
         sendEmail(toEmail, otp, "signup_verification", "Locvia - Verify your email address");
     }
 
+    /**
+     * Sends a diagnostic email without any OTP or sensitive data.
+     * Used for verifying Gmail API connectivity and delivery.
+     *
+     * @param recipientEmail recipient email address
+     * @param subject        email subject
+     * @param bodyText       plain text body
+     */
+    public void sendDiagnosticEmail(String recipientEmail, String subject, String bodyText) {
+        if (senderEmail.isBlank()) {
+            log.warn("Gmail sender email is not configured. Skipping email dispatch.");
+            return;
+        }
+
+        if (this.gmailClient == null && (clientId.isBlank() || clientSecret.isBlank() || refreshToken.isBlank())) {
+            log.warn("Gmail API OAuth credentials are not fully configured. Skipping email dispatch.");
+            return;
+        }
+
+        try {
+            String plainText = bodyText;
+            String html = "<p style=\"font-family: sans-serif; font-size: 16px; color: #333;\">" +
+                    bodyText.replace("\n", "<br/>") + "</p>";
+            String rawMime = buildMimeMessage(senderEmail, recipientEmail, subject, plainText, html);
+
+            Message message = createGmailMessage(rawMime);
+
+            Gmail service = getGmailService();
+            service.users().messages().send("me", message).execute();
+
+            log.info("Email [{}] successfully sent via Gmail API to recipient: {}", subject, recipientEmail);
+        } catch (Exception e) {
+            log.error("Failed to send diagnostic email via Gmail API to recipient {}: [{}]: {}",
+                    recipientEmail,
+                    e.getClass().getName(),
+                    e.getMessage());
+            throw new ExternalServiceException("Failed to send diagnostic email: " + e.getMessage(), e);
+        }
+    }
+
     private void sendEmail(String recipientEmail, String otp, String type, String subject) {
         if (senderEmail.isBlank()) {
             log.warn("Gmail sender email is not configured. Skipping email dispatch.");
@@ -151,13 +191,11 @@ public class GmailApiEmailService implements EmailService {
         String boundary = "=_locvia_" + UUID.randomUUID().toString().replace("-", "");
         String fromHeader = formatFromHeader(sender);
         String dateHeader = DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.now());
-        String messageId = "<" + UUID.randomUUID().toString() + "@locvia.com>";
 
         StringBuilder sb = new StringBuilder();
         sb.append("From: ").append(fromHeader).append("\r\n");
         sb.append("To: ").append(recipient).append("\r\n");
         sb.append("Date: ").append(dateHeader).append("\r\n");
-        sb.append("Message-ID: ").append(messageId).append("\r\n");
         sb.append("Subject: ").append(subject).append("\r\n");
         sb.append("MIME-Version: 1.0\r\n");
         sb.append("Content-Type: multipart/alternative; boundary=\"").append(boundary).append("\"\r\n\r\n");
